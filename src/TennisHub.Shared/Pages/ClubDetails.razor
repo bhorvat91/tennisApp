@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @inject IAuthService AuthService
 @inject IClubService ClubService
+@inject ICourtService CourtService
 @inject IMembershipService MembershipService
 @inject NavigationManager Navigation
 
@@ -23,7 +24,41 @@ else
     <p><strong>Status članstva:</strong> @_membershipStatusText</p>
 
     <h2>Tereni</h2>
-    <p>U ovoj fazi još nema dostupnih terena.</p>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+    else if (!_hasCourtAccess)
+    {
+        <p>Popis terena dostupan je nakon odobrenja članstva.</p>
+    }
+    else if (_courts.Count == 0)
+    {
+        <p>Klub još nema evidentiranih terena.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Naziv</th>
+                    <th>Podloga</th>
+                    <th>Reflektori</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var court in _courts)
+                {
+                    <tr>
+                        <td>@court.Name</td>
+                        <td>@(string.IsNullOrWhiteSpace(court.SurfaceType) ? "-" : court.SurfaceType)</td>
+                        <td>@(court.HasFloodlights ? "Da" : "Ne")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
 
     @if (_isAdmin)
     {
@@ -36,13 +71,21 @@ else
     public Guid Id { get; set; }
 
     private TennisHub.Core.Models.Club? _club;
+    private readonly List<TennisHub.Core.Models.Court> _courts = [];
     private bool _isLoading = true;
     private bool _isAdmin;
+    private bool _hasCourtAccess;
     private string _membershipStatusText = "Nije član";
+    private string? _errorMessage;
 
     protected override async Task OnParametersSetAsync()
     {
         _isLoading = true;
+        _errorMessage = null;
+        _courts.Clear();
+        _isAdmin = false;
+        _hasCourtAccess = false;
+        _membershipStatusText = "Nije član";
 
         await AuthService.InitializeAsync();
         var user = AuthService.CurrentUser;
@@ -59,6 +102,7 @@ else
         {
             _isAdmin = membership.Status == TennisHub.Core.Enums.MembershipStatus.Approved
                 && membership.Role == TennisHub.Core.Enums.MembershipRole.Admin;
+            _hasCourtAccess = membership.Status == TennisHub.Core.Enums.MembershipStatus.Approved;
             _membershipStatusText = membership.Status switch
             {
                 TennisHub.Core.Enums.MembershipStatus.Pending => "Na čekanju",
@@ -67,6 +111,18 @@ else
                 TennisHub.Core.Enums.MembershipStatus.Approved => "Odobren",
                 _ => "Nije član"
             };
+        }
+
+        if (_hasCourtAccess)
+        {
+            try
+            {
+                _courts.AddRange(await CourtService.GetCourtsAsync(Id));
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Neuspješno učitavanje terena: {ex.Message}";
+            }
         }
 
         _isLoading = false;

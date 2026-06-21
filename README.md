@@ -1,6 +1,6 @@
 # TennisHub MVP
 
-Ovaj repository pokriva TennisHub MVP faze 1–4 (setup, auth, klubovi, admin odobravanje članstva) kroz projekte:
+Ovaj repository pokriva TennisHub MVP faze 1–5 (setup, auth, klubovi, admin odobravanje članstva, court CRUD) kroz projekte:
 
 - `src/TennisHub.Core`
 - `src/TennisHub.Shared`

@@ -2,6 +2,7 @@
 @attribute [Authorize]
 @inject IAuthService AuthService
 @inject IMembershipService MembershipService
+@inject ICourtService CourtService
 @inject NavigationManager Navigation
 
 <PageTitle>Admin dashboard</PageTitle>
@@ -70,6 +71,71 @@ else
             }
         </ul>
     }
+
+    <h2>Tereni</h2>
+
+    <EditForm Model="_courtModel" OnValidSubmit="SaveCourtAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="row g-3 align-items-end mb-3">
+            <div class="col-md-4">
+                <label class="form-label" for="court-name">Naziv</label>
+                <InputText id="court-name" class="form-control" @bind-Value="_courtModel.Name" />
+            </div>
+            <div class="col-md-4">
+                <label class="form-label" for="court-surface">Podloga</label>
+                <InputText id="court-surface" class="form-control" @bind-Value="_courtModel.SurfaceType" />
+            </div>
+            <div class="col-md-2">
+                <div class="form-check mb-2">
+                    <InputCheckbox id="court-floodlights" class="form-check-input" @bind-Value="_courtModel.HasFloodlights" />
+                    <label class="form-check-label" for="court-floodlights">Reflektori</label>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary me-2" type="submit" disabled="@_isSavingCourt">
+                    @(_editingCourtId.HasValue ? "Spremi izmjene" : "Dodaj teren")
+                </button>
+                @if (_editingCourtId.HasValue)
+                {
+                    <button class="btn btn-outline-secondary" type="button" @onclick="CancelCourtEdit">Odustani</button>
+                }
+            </div>
+        </div>
+    </EditForm>
+
+    @if (_courts.Count == 0)
+    {
+        <p>Nema evidentiranih terena.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Naziv</th>
+                    <th>Podloga</th>
+                    <th>Reflektori</th>
+                    <th>Akcije</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var court in _courts)
+                {
+                    <tr>
+                        <td>@court.Name</td>
+                        <td>@(string.IsNullOrWhiteSpace(court.SurfaceType) ? "-" : court.SurfaceType)</td>
+                        <td>@(court.HasFloodlights ? "Da" : "Ne")</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary me-2" type="button" @onclick="() => EditCourt(court)">Uredi</button>
+                            <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => DeleteCourtAsync(court)">Obriši</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
 }
 
 @code {
@@ -78,8 +144,12 @@ else
 
     private readonly List<TennisHub.Core.Models.ClubMembership> _pendingMemberships = [];
     private readonly List<TennisHub.Core.Models.ClubMembership> _approvedMemberships = [];
+    private readonly List<TennisHub.Core.Models.Court> _courts = [];
+    private readonly CourtFormModel _courtModel = new();
     private bool _isLoading = true;
     private bool _isAdmin;
+    private bool _isSavingCourt;
+    private Guid? _editingCourtId;
     private string? _errorMessage;
 
     protected override async Task OnParametersSetAsync()
@@ -119,6 +189,9 @@ else
         _approvedMemberships.Clear();
         _approvedMemberships.AddRange(await MembershipService.GetApprovedMembershipsAsync(Id));
 
+        _courts.Clear();
+        _courts.AddRange(await CourtService.GetCourtsAsync(Id));
+
         _isLoading = false;
     }
 
@@ -138,5 +211,98 @@ else
         {
             _errorMessage = $"Promjena statusa nije uspjela: {ex.Message}";
         }
+    }
+
+    private async Task SaveCourtAsync()
+    {
+        _errorMessage = null;
+        _isSavingCourt = true;
+
+        try
+        {
+            var success = _editingCourtId.HasValue
+                ? await CourtService.UpdateCourtAsync(_editingCourtId.Value, _courtModel.Name, _courtModel.SurfaceType, _courtModel.HasFloodlights)
+                : await CourtService.CreateCourtAsync(Id, _courtModel.Name, _courtModel.SurfaceType, _courtModel.HasFloodlights) is not null;
+
+            if (!success)
+            {
+                _errorMessage = _editingCourtId.HasValue
+                    ? "Spremanje izmjena terena nije uspjelo."
+                    : "Dodavanje terena nije uspjelo.";
+                return;
+            }
+
+            ResetCourtForm();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = _editingCourtId.HasValue
+                ? $"Spremanje izmjena terena nije uspjelo: {ex.Message}"
+                : $"Dodavanje terena nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isSavingCourt = false;
+        }
+    }
+
+    private void EditCourt(TennisHub.Core.Models.Court court)
+    {
+        _editingCourtId = court.Id;
+        _courtModel.Name = court.Name;
+        _courtModel.SurfaceType = court.SurfaceType;
+        _courtModel.HasFloodlights = court.HasFloodlights;
+        _errorMessage = null;
+    }
+
+    private void CancelCourtEdit()
+    {
+        ResetCourtForm();
+        _errorMessage = null;
+    }
+
+    private async Task DeleteCourtAsync(TennisHub.Core.Models.Court court)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            var success = await CourtService.DeleteCourtAsync(court.Id);
+            if (!success)
+            {
+                _errorMessage = "Brisanje terena nije uspjelo.";
+                return;
+            }
+
+            if (_editingCourtId == court.Id)
+            {
+                ResetCourtForm();
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Brisanje terena nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private void ResetCourtForm()
+    {
+        _editingCourtId = null;
+        _courtModel.Name = string.Empty;
+        _courtModel.SurfaceType = null;
+        _courtModel.HasFloodlights = false;
+    }
+
+    private sealed class CourtFormModel
+    {
+        [Required(ErrorMessage = "Naziv terena je obavezan.")]
+        public string Name { get; set; } = string.Empty;
+
+        public string? SurfaceType { get; set; }
+
+        public bool HasFloodlights { get; set; }
     }
 }

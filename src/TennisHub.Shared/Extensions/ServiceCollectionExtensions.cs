@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using TennisHub.Shared.Configuration;
 using TennisHub.Shared.Services.Auth;
 using TennisHub.Shared.Services.Clubs;
+using TennisHub.Shared.Services.Courts;
 using TennisHub.Shared.Services.Memberships;
 
 namespace TennisHub.Shared.Extensions;
@@ -29,6 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<AuthenticationStateProvider>(sp => sp.GetRequiredService<SupabaseAuthenticationStateProvider>());
 
         services.AddScoped<IClubService, ClubService>();
+        services.AddScoped<ICourtService, CourtService>();
         services.AddScoped<IMembershipService, MembershipService>();
 
         return services;
