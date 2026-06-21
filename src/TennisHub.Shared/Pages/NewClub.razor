@@ -1,0 +1,80 @@
+@page "/clubs/new"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IClubService ClubService
+@inject NavigationManager Navigation
+
+<PageTitle>Novi klub</PageTitle>
+
+<h1>Novi klub</h1>
+
+<EditForm Model="_model" OnValidSubmit="CreateClubAsync">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label class="form-label" for="name">Naziv</label>
+        <InputText id="name" class="form-control" @bind-Value="_model.Name" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label" for="address">Adresa</label>
+        <InputText id="address" class="form-control" @bind-Value="_model.Address" />
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+
+    <button class="btn btn-primary" type="submit" disabled="@_isLoading">Spremi</button>
+</EditForm>
+
+@code {
+    private readonly CreateClubModel _model = new();
+    private bool _isLoading;
+    private string? _errorMessage;
+
+    private async Task CreateClubAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            await AuthService.InitializeAsync();
+            var user = AuthService.CurrentUser;
+
+            if (user is null || !Guid.TryParse(user.Id, out var userId))
+            {
+                Navigation.NavigateTo("/login", true);
+                return;
+            }
+
+            var club = await ClubService.CreateClubAsync(_model.Name, _model.Address, userId);
+            if (club is null)
+            {
+                _errorMessage = "Kreiranje kluba nije uspjelo.";
+                return;
+            }
+
+            Navigation.NavigateTo($"/clubs/{club.Id}", true);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kreiranje kluba nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private sealed class CreateClubModel
+    {
+        [Required(ErrorMessage = "Naziv kluba je obavezan.")]
+        public string Name { get; set; } = string.Empty;
+
+        public string? Address { get; set; }
+    }
+}

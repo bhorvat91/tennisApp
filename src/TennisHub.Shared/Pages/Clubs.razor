@@ -1,0 +1,149 @@
+@page "/clubs"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IClubService ClubService
+@inject IMembershipService MembershipService
+@inject NavigationManager Navigation
+
+<PageTitle>Klubovi</PageTitle>
+
+<h1>Klubovi</h1>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+
+@if (_isLoading)
+{
+    <p>Učitavanje klubova...</p>
+}
+else if (_clubs.Count == 0)
+{
+    <p>Nema dostupnih klubova.</p>
+}
+else
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Naziv</th>
+                <th>Adresa</th>
+                <th>Status</th>
+                <th>Akcije</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var club in _clubs)
+            {
+                var membership = _membershipByClubId.GetValueOrDefault(club.Id);
+                var statusText = GetStatusText(membership);
+                <tr>
+                    <td><a href="@($"/clubs/{club.Id}")">@club.Name</a></td>
+                    <td>@(string.IsNullOrWhiteSpace(club.Address) ? "-" : club.Address)</td>
+                    <td>@statusText</td>
+                    <td>
+                        @if (membership is null)
+                        {
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => JoinClubAsync(club.Id)">Pridruži se</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private readonly List<TennisHub.Core.Models.Club> _clubs = [];
+    private readonly Dictionary<Guid, TennisHub.Core.Models.ClubMembership> _membershipByClubId = [];
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            await AuthService.InitializeAsync();
+            var user = AuthService.CurrentUser;
+
+            if (user is null || !Guid.TryParse(user.Id, out var userId))
+            {
+                Navigation.NavigateTo("/login", true);
+                return;
+            }
+
+            _clubs.Clear();
+            _clubs.AddRange(await ClubService.GetClubsAsync());
+
+            _membershipByClubId.Clear();
+            var memberships = await ClubService.GetCurrentUserMembershipsAsync(userId);
+            foreach (var membership in memberships)
+            {
+                _membershipByClubId[membership.ClubId] = membership;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Neuspješno učitavanje klubova: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task JoinClubAsync(Guid clubId)
+    {
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        try
+        {
+            var success = await MembershipService.RequestJoinAsync(clubId, userId);
+            if (success)
+            {
+                await LoadDataAsync();
+            }
+            else
+            {
+                _errorMessage = "Slanje zahtjeva nije uspjelo.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Slanje zahtjeva nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private static string GetStatusText(TennisHub.Core.Models.ClubMembership? membership)
+    {
+        if (membership is null)
+        {
+            return "Nije član";
+        }
+
+        return membership.Status switch
+        {
+            TennisHub.Core.Enums.MembershipStatus.Pending => "Na čekanju",
+            TennisHub.Core.Enums.MembershipStatus.Rejected => "Odbijen",
+            TennisHub.Core.Enums.MembershipStatus.Approved when membership.Role == TennisHub.Core.Enums.MembershipRole.Admin => "Admin",
+            TennisHub.Core.Enums.MembershipStatus.Approved => "Odobren",
+            _ => "Nije član"
+        };
+    }
+}

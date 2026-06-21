@@ -1,0 +1,74 @@
+@page "/clubs/{Id:guid}"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IClubService ClubService
+@inject IMembershipService MembershipService
+@inject NavigationManager Navigation
+
+<PageTitle>Detalji kluba</PageTitle>
+
+@if (_isLoading)
+{
+    <p>Učitavanje...</p>
+}
+else if (_club is null)
+{
+    <div class="alert alert-warning">Klub nije pronađen.</div>
+}
+else
+{
+    <h1>@_club.Name</h1>
+    <p><strong>Adresa:</strong> @(string.IsNullOrWhiteSpace(_club.Address) ? "-" : _club.Address)</p>
+
+    <p><strong>Status članstva:</strong> @_membershipStatusText</p>
+
+    <h2>Tereni</h2>
+    <p>U ovoj fazi još nema dostupnih terena.</p>
+
+    @if (_isAdmin)
+    {
+        <a class="btn btn-outline-primary" href="@($"/clubs/{Id}/admin")">Admin dashboard</a>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private TennisHub.Core.Models.Club? _club;
+    private bool _isLoading = true;
+    private bool _isAdmin;
+    private string _membershipStatusText = "Nije član";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        _club = await ClubService.GetClubByIdAsync(Id);
+
+        var membership = await MembershipService.GetMembershipAsync(Id, userId);
+        if (membership is not null)
+        {
+            _isAdmin = membership.Status == TennisHub.Core.Enums.MembershipStatus.Approved
+                && membership.Role == TennisHub.Core.Enums.MembershipRole.Admin;
+            _membershipStatusText = membership.Status switch
+            {
+                TennisHub.Core.Enums.MembershipStatus.Pending => "Na čekanju",
+                TennisHub.Core.Enums.MembershipStatus.Rejected => "Odbijen",
+                TennisHub.Core.Enums.MembershipStatus.Approved when _isAdmin => "Admin",
+                TennisHub.Core.Enums.MembershipStatus.Approved => "Odobren",
+                _ => "Nije član"
+            };
+        }
+
+        _isLoading = false;
+    }
+}

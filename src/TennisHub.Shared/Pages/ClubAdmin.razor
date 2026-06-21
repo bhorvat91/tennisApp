@@ -1,0 +1,142 @@
+@page "/clubs/{Id:guid}/admin"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IMembershipService MembershipService
+@inject NavigationManager Navigation
+
+<PageTitle>Admin dashboard</PageTitle>
+
+<h1>Admin dashboard</h1>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+
+@if (_isLoading)
+{
+    <p>Učitavanje zahtjeva...</p>
+}
+else if (!_isAdmin)
+{
+    <div class="alert alert-warning">Nemate administratorska prava za ovaj klub.</div>
+}
+else
+{
+    <h2>Zahtjevi na čekanju</h2>
+
+    @if (_pendingMemberships.Count == 0)
+    {
+        <p>Nema zahtjeva na čekanju.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Korisnik</th>
+                    <th>Datum zahtjeva</th>
+                    <th>Akcije</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var membership in _pendingMemberships)
+                {
+                    <tr>
+                        <td>@membership.UserId</td>
+                        <td>@membership.JoinedAt.ToLocalTime().ToString("dd.MM.yyyy. HH:mm")</td>
+                        <td>
+                            <button class="btn btn-sm btn-success me-2" @onclick='() => DecideAsync(membership, "approved")'>Odobri</button>
+                            <button class="btn btn-sm btn-danger" @onclick='() => DecideAsync(membership, "rejected")'>Odbij</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+
+    <h2>Odobreni članovi</h2>
+
+    @if (_approvedMemberships.Count == 0)
+    {
+        <p>Nema odobrenih članova.</p>
+    }
+    else
+    {
+        <ul>
+            @foreach (var membership in _approvedMemberships)
+            {
+                <li>@membership.UserId (@(membership.Role == TennisHub.Core.Enums.MembershipRole.Admin ? "admin" : "member"))</li>
+            }
+        </ul>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private readonly List<TennisHub.Core.Models.ClubMembership> _pendingMemberships = [];
+    private readonly List<TennisHub.Core.Models.ClubMembership> _approvedMemberships = [];
+    private bool _isLoading = true;
+    private bool _isAdmin;
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        var currentMembership = await MembershipService.GetMembershipAsync(Id, userId);
+        _isAdmin = currentMembership is not null
+            && currentMembership.Status == TennisHub.Core.Enums.MembershipStatus.Approved
+            && currentMembership.Role == TennisHub.Core.Enums.MembershipRole.Admin;
+
+        if (!_isAdmin)
+        {
+            _pendingMemberships.Clear();
+            _approvedMemberships.Clear();
+            _isLoading = false;
+            return;
+        }
+
+        _pendingMemberships.Clear();
+        _pendingMemberships.AddRange(await MembershipService.GetPendingMembershipsAsync(Id));
+
+        _approvedMemberships.Clear();
+        _approvedMemberships.AddRange(await MembershipService.GetApprovedMembershipsAsync(Id));
+
+        _isLoading = false;
+    }
+
+    private async Task DecideAsync(TennisHub.Core.Models.ClubMembership membership, string status)
+    {
+        try
+        {
+            var success = await MembershipService.UpdateMembershipStatusAsync(membership, status);
+            if (!success)
+            {
+                _errorMessage = "Promjena statusa nije uspjela.";
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Promjena statusa nije uspjela: {ex.Message}";
+        }
+    }
+}
