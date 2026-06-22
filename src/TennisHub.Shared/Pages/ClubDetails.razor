@@ -45,6 +45,7 @@ else
                     <th>Naziv</th>
                     <th>Podloga</th>
                     <th>Reflektori</th>
+                    <th>Rezervacija</th>
                 </tr>
             </thead>
             <tbody>
@@ -54,6 +55,9 @@ else
                         <td>@court.Name</td>
                         <td>@(string.IsNullOrWhiteSpace(court.SurfaceType) ? "-" : court.SurfaceType)</td>
                         <td>@(court.HasFloodlights ? "Da" : "Ne")</td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary" href="@($"/clubs/{Id}/courts/{court.Id}/reserve")">Rezerviraj</a>
+                        </td>
                     </tr>
                 }
             </tbody>
