@@ -3,6 +3,7 @@
 @inject IAuthService AuthService
 @inject IMembershipService MembershipService
 @inject ICourtService CourtService
+@inject IBookingRuleService BookingRuleService
 @inject NavigationManager Navigation
 
 <PageTitle>Admin dashboard</PageTitle>
@@ -136,6 +137,27 @@ else
             </tbody>
         </table>
     }
+
+    <h2>Pravila rezervacije</h2>
+
+    <EditForm Model="_bookingRulesModel" OnValidSubmit="SaveBookingRulesAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="row g-3 align-items-end mb-3">
+            <div class="col-md-3">
+                <label class="form-label" for="max-hours">Maks. sati po rezervaciji</label>
+                <InputNumber id="max-hours" class="form-control" @bind-Value="_bookingRulesModel.MaxHoursPerBooking" />
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="max-days">Maks. dana unaprijed</label>
+                <InputNumber id="max-days" class="form-control" @bind-Value="_bookingRulesModel.MaxAdvanceDays" />
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary" type="submit" disabled="@_isSavingBookingRules">Spremi pravila</button>
+            </div>
+        </div>
+    </EditForm>
 }
 
 @code {
@@ -146,9 +168,11 @@ else
     private readonly List<TennisHub.Core.Models.ClubMembership> _approvedMemberships = [];
     private readonly List<TennisHub.Core.Models.Court> _courts = [];
     private readonly CourtFormModel _courtModel = new();
+    private readonly BookingRulesFormModel _bookingRulesModel = new();
     private bool _isLoading = true;
     private bool _isAdmin;
     private bool _isSavingCourt;
+    private bool _isSavingBookingRules;
     private Guid? _editingCourtId;
     private string? _errorMessage;
 
@@ -191,6 +215,10 @@ else
 
         _courts.Clear();
         _courts.AddRange(await CourtService.GetCourtsAsync(Id));
+
+        var rules = await BookingRuleService.GetRulesAsync(Id);
+        _bookingRulesModel.MaxHoursPerBooking = rules?.MaxHoursPerBooking ?? 2;
+        _bookingRulesModel.MaxAdvanceDays = rules?.MaxAdvanceDays ?? 7;
 
         _isLoading = false;
     }
@@ -296,6 +324,36 @@ else
         _courtModel.HasFloodlights = false;
     }
 
+    private async Task SaveBookingRulesAsync()
+    {
+        _errorMessage = null;
+        _isSavingBookingRules = true;
+
+        try
+        {
+            var success = await BookingRuleService.UpdateRulesAsync(
+                Id,
+                _bookingRulesModel.MaxHoursPerBooking,
+                _bookingRulesModel.MaxAdvanceDays);
+
+            if (!success)
+            {
+                _errorMessage = "Spremanje pravila rezervacije nije uspjelo.";
+                return;
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Spremanje pravila rezervacije nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isSavingBookingRules = false;
+        }
+    }
+
     private sealed class CourtFormModel
     {
         [Required(ErrorMessage = "Naziv terena je obavezan.")]
@@ -304,5 +362,14 @@ else
         public string? SurfaceType { get; set; }
 
         public bool HasFloodlights { get; set; }
+    }
+
+    private sealed class BookingRulesFormModel
+    {
+        [Range(typeof(decimal), "0.5", "24", ErrorMessage = "Maksimalno trajanje mora biti između 0.5 i 24 sata.")]
+        public decimal MaxHoursPerBooking { get; set; } = 2;
+
+        [Range(1, 365, ErrorMessage = "Maksimalni broj dana unaprijed mora biti između 1 i 365.")]
+        public int MaxAdvanceDays { get; set; } = 7;
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TennisHub.Shared.Configuration;
 using TennisHub.Shared.Services.Auth;
+using TennisHub.Shared.Services.BookingRules;
 using TennisHub.Shared.Services.Clubs;
 using TennisHub.Shared.Services.Courts;
 using TennisHub.Shared.Services.Memberships;
@@ -32,6 +33,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IClubService, ClubService>();
         services.AddScoped<ICourtService, CourtService>();
         services.AddScoped<IMembershipService, MembershipService>();
+        services.AddScoped<IBookingRuleService, BookingRuleService>();
 
         return services;
     }
