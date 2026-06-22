@@ -17,7 +17,11 @@
 
 @if (_isLoading)
 {
-    <p>Učitavanje zahtjeva...</p>
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
 }
 else if (!_isAdmin)
 {
@@ -25,139 +29,155 @@ else if (!_isAdmin)
 }
 else
 {
-    <h2>Zahtjevi na čekanju</h2>
-
-    @if (_pendingMemberships.Count == 0)
-    {
-        <p>Nema zahtjeva na čekanju.</p>
-    }
-    else
-    {
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Korisnik</th>
-                    <th>Datum zahtjeva</th>
-                    <th>Akcije</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var membership in _pendingMemberships)
-                {
-                    <tr>
-                        <td>@membership.UserId</td>
-                        <td>@membership.JoinedAt.ToLocalTime().ToString("dd.MM.yyyy. HH:mm")</td>
-                        <td>
-                            <button class="btn btn-sm btn-success me-2" @onclick='() => DecideAsync(membership, "approved")'>Odobri</button>
-                            <button class="btn btn-sm btn-danger" @onclick='() => DecideAsync(membership, "rejected")'>Odbij</button>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
-
-    <h2>Odobreni članovi</h2>
-
-    @if (_approvedMemberships.Count == 0)
-    {
-        <p>Nema odobrenih članova.</p>
-    }
-    else
-    {
-        <ul>
-            @foreach (var membership in _approvedMemberships)
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Zahtjevi na čekanju</h5></div>
+        <div class="card-body">
+            @if (_pendingMemberships.Count == 0)
             {
-                <li>@membership.UserId (@(membership.Role == TennisHub.Core.Enums.MembershipRole.Admin ? "admin" : "member"))</li>
+                <p>Nema zahtjeva na čekanju.</p>
             }
-        </ul>
-    }
-
-    <h2>Tereni</h2>
-
-    <EditForm Model="_courtModel" OnValidSubmit="SaveCourtAsync">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
-
-        <div class="row g-3 align-items-end mb-3">
-            <div class="col-md-4">
-                <label class="form-label" for="court-name">Naziv</label>
-                <InputText id="court-name" class="form-control" @bind-Value="_courtModel.Name" />
-            </div>
-            <div class="col-md-4">
-                <label class="form-label" for="court-surface">Podloga</label>
-                <InputText id="court-surface" class="form-control" @bind-Value="_courtModel.SurfaceType" />
-            </div>
-            <div class="col-md-2">
-                <div class="form-check mb-2">
-                    <InputCheckbox id="court-floodlights" class="form-check-input" @bind-Value="_courtModel.HasFloodlights" />
-                    <label class="form-check-label" for="court-floodlights">Reflektori</label>
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Korisnik</th>
+                                <th>Datum zahtjeva</th>
+                                <th>Akcije</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var membership in _pendingMemberships)
+                            {
+                                <tr>
+                                    <td>@membership.UserId</td>
+                                    <td>@membership.JoinedAt.ToLocalTime().ToString("dd.MM.yyyy. HH:mm")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-success me-2" @onclick='() => DecideAsync(membership, "approved")'>Odobri</button>
+                                        <button class="btn btn-sm btn-danger" @onclick='() => DecideAsync(membership, "rejected")'>Odbij</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
                 </div>
-            </div>
-            <div class="col-md-2">
-                <button class="btn btn-primary me-2" type="submit" disabled="@_isSavingCourt">
-                    @(_editingCourtId.HasValue ? "Spremi izmjene" : "Dodaj teren")
-                </button>
-                @if (_editingCourtId.HasValue)
-                {
-                    <button class="btn btn-outline-secondary" type="button" @onclick="CancelCourtEdit">Odustani</button>
-                }
-            </div>
+            }
         </div>
-    </EditForm>
+    </div>
 
-    @if (_courts.Count == 0)
-    {
-        <p>Nema evidentiranih terena.</p>
-    }
-    else
-    {
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Naziv</th>
-                    <th>Podloga</th>
-                    <th>Reflektori</th>
-                    <th>Akcije</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var court in _courts)
-                {
-                    <tr>
-                        <td>@court.Name</td>
-                        <td>@(string.IsNullOrWhiteSpace(court.SurfaceType) ? "-" : court.SurfaceType)</td>
-                        <td>@(court.HasFloodlights ? "Da" : "Ne")</td>
-                        <td>
-                            <button class="btn btn-sm btn-outline-primary me-2" type="button" @onclick="() => EditCourt(court)">Uredi</button>
-                            <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => DeleteCourtAsync(court)">Obriši</button>
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    }
-
-    <h2>Pravila rezervacije</h2>
-
-    <EditForm Model="_bookingRulesModel" OnValidSubmit="SaveBookingRulesAsync">
-        <DataAnnotationsValidator />
-        <ValidationSummary />
-
-        <div class="row g-3 align-items-end mb-3">
-            <div class="col-md-3">
-                <label class="form-label" for="max-hours">Maks. sati po rezervaciji</label>
-                <InputNumber id="max-hours" class="form-control" @bind-Value="_bookingRulesModel.MaxHoursPerBooking" />
-            </div>
-            <div class="col-md-3">
-                <label class="form-label" for="max-days">Maks. dana unaprijed</label>
-                <InputNumber id="max-days" class="form-control" @bind-Value="_bookingRulesModel.MaxAdvanceDays" />
-            </div>
-            <div class="col-md-2">
-                <button class="btn btn-primary" type="submit" disabled="@_isSavingBookingRules">Spremi pravila</button>
-            </div>
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Odobreni članovi</h5></div>
+        <div class="card-body">
+            @if (_approvedMemberships.Count == 0)
+            {
+                <p>Nema odobrenih članova.</p>
+            }
+            else
+            {
+                <ul>
+                    @foreach (var membership in _approvedMemberships)
+                    {
+                        <li>@membership.UserId (@(membership.Role == TennisHub.Core.Enums.MembershipRole.Admin ? "admin" : "member"))</li>
+                    }
+                </ul>
+            }
         </div>
-    </EditForm>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Tereni</h5></div>
+        <div class="card-body">
+            <EditForm Model="_courtModel" OnValidSubmit="SaveCourtAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="court-name">Naziv</label>
+                        <InputText id="court-name" class="form-control" @bind-Value="_courtModel.Name" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="court-surface">Podloga</label>
+                        <InputText id="court-surface" class="form-control" @bind-Value="_courtModel.SurfaceType" />
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-check mb-2">
+                            <InputCheckbox id="court-floodlights" class="form-check-input" @bind-Value="_courtModel.HasFloodlights" />
+                            <label class="form-check-label" for="court-floodlights">Reflektori</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary me-2" type="submit" disabled="@_isSavingCourt">
+                            @(_editingCourtId.HasValue ? "Spremi izmjene" : "Dodaj teren")
+                        </button>
+                        @if (_editingCourtId.HasValue)
+                        {
+                            <button class="btn btn-outline-secondary" type="button" @onclick="CancelCourtEdit">Odustani</button>
+                        }
+                    </div>
+                </div>
+            </EditForm>
+
+            @if (_courts.Count == 0)
+            {
+                <p>Nema evidentiranih terena.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Naziv</th>
+                                <th>Podloga</th>
+                                <th>Reflektori</th>
+                                <th>Akcije</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var court in _courts)
+                            {
+                                <tr>
+                                    <td>@court.Name</td>
+                                    <td>@(string.IsNullOrWhiteSpace(court.SurfaceType) ? "-" : court.SurfaceType)</td>
+                                    <td>@(court.HasFloodlights ? "Da" : "Ne")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary me-2" type="button" @onclick="() => EditCourt(court)">Uredi</button>
+                                        <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => DeleteCourtAsync(court)">Obriši</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Pravila rezervacije</h5></div>
+        <div class="card-body">
+            <EditForm Model="_bookingRulesModel" OnValidSubmit="SaveBookingRulesAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label" for="max-hours">Maks. sati po rezervaciji</label>
+                        <InputNumber id="max-hours" class="form-control" @bind-Value="_bookingRulesModel.MaxHoursPerBooking" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="max-days">Maks. dana unaprijed</label>
+                        <InputNumber id="max-days" class="form-control" @bind-Value="_bookingRulesModel.MaxAdvanceDays" />
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary" type="submit" disabled="@_isSavingBookingRules">Spremi pravila</button>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+    </div>
 }
 
 @code {

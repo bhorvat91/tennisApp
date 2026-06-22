@@ -11,7 +11,11 @@
 
 @if (_isLoading)
 {
-    <p>Učitavanje...</p>
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
 }
 else if (_court is null)
 {
@@ -90,33 +94,35 @@ else
     }
     else
     {
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Početak</th>
-                    <th>Kraj</th>
-                    <th>Status</th>
-                    <th>Akcija</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var res in _reservations)
-                {
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead>
                     <tr>
-                        <td>@res.StartTime.ToLocalTime().ToString("HH:mm")</td>
-                        <td>@res.EndTime.ToLocalTime().ToString("HH:mm")</td>
-                        <td>@(res.UserId == _currentUserId ? "Moja rezervacija" : "Rezervirano")</td>
-                        <td>
-                            @if (res.UserId == _currentUserId)
-                            {
-                                <button class="btn btn-sm btn-outline-danger"
-                                        @onclick="() => CancelReservationAsync(res)">Otkaži</button>
-                            }
-                        </td>
+                        <th>Početak</th>
+                        <th>Kraj</th>
+                        <th>Status</th>
+                        <th>Akcija</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var res in _reservations)
+                    {
+                        <tr>
+                            <td>@res.StartTime.ToLocalTime().ToString("HH:mm")</td>
+                            <td>@res.EndTime.ToLocalTime().ToString("HH:mm")</td>
+                            <td>@(res.UserId == _currentUserId ? "Moja rezervacija" : "Rezervirano")</td>
+                            <td>
+                                @if (res.UserId == _currentUserId)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => CancelReservationAsync(res)">Otkaži</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     }
 
     <div class="mt-3">

@@ -10,7 +10,11 @@
 
 @if (_isLoading)
 {
-    <p>Učitavanje...</p>
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
 }
 else if (_club is null)
 {
@@ -21,7 +25,7 @@ else
     <h1>@_club.Name</h1>
     <p><strong>Adresa:</strong> @(string.IsNullOrWhiteSpace(_club.Address) ? "-" : _club.Address)</p>
 
-    <p><strong>Status članstva:</strong> @_membershipStatusText</p>
+    <p><strong>Status članstva:</strong> <span class="badge @_membershipBadgeClass">@_membershipStatusText</span></p>
 
     <h2>Tereni</h2>
 
@@ -39,29 +43,31 @@ else
     }
     else
     {
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Naziv</th>
-                    <th>Podloga</th>
-                    <th>Reflektori</th>
-                    <th>Rezervacija</th>
-                </tr>
-            </thead>
-            <tbody>
-                @foreach (var court in _courts)
-                {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
                     <tr>
-                        <td>@court.Name</td>
-                        <td>@(string.IsNullOrWhiteSpace(court.SurfaceType) ? "-" : court.SurfaceType)</td>
-                        <td>@(court.HasFloodlights ? "Da" : "Ne")</td>
-                        <td>
-                            <a class="btn btn-sm btn-outline-primary" href="@($"/clubs/{Id}/courts/{court.Id}/reserve")">Rezerviraj</a>
-                        </td>
+                        <th>Naziv</th>
+                        <th>Podloga</th>
+                        <th>Reflektori</th>
+                        <th>Rezervacija</th>
                     </tr>
-                }
-            </tbody>
-        </table>
+                </thead>
+                <tbody>
+                    @foreach (var court in _courts)
+                    {
+                        <tr>
+                            <td>@court.Name</td>
+                            <td>@(string.IsNullOrWhiteSpace(court.SurfaceType) ? "-" : court.SurfaceType)</td>
+                            <td>@(court.HasFloodlights ? "Da" : "Ne")</td>
+                            <td>
+                                <a class="btn btn-sm btn-outline-primary" href="@($"/clubs/{Id}/courts/{court.Id}/reserve")">Rezerviraj</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
     }
 
     @if (_isAdmin)
@@ -80,6 +86,7 @@ else
     private bool _isAdmin;
     private bool _hasCourtAccess;
     private string _membershipStatusText = "Nije član";
+    private string _membershipBadgeClass = "bg-secondary";
     private string? _errorMessage;
 
     protected override async Task OnParametersSetAsync()
@@ -90,6 +97,7 @@ else
         _isAdmin = false;
         _hasCourtAccess = false;
         _membershipStatusText = "Nije član";
+        _membershipBadgeClass = "bg-secondary";
 
         await AuthService.InitializeAsync();
         var user = AuthService.CurrentUser;
@@ -114,6 +122,13 @@ else
                 TennisHub.Core.Enums.MembershipStatus.Approved when _isAdmin => "Admin",
                 TennisHub.Core.Enums.MembershipStatus.Approved => "Odobren",
                 _ => "Nije član"
+            };
+            _membershipBadgeClass = membership.Status switch
+            {
+                TennisHub.Core.Enums.MembershipStatus.Pending => "bg-warning text-dark",
+                TennisHub.Core.Enums.MembershipStatus.Rejected => "bg-danger",
+                TennisHub.Core.Enums.MembershipStatus.Approved => "bg-success",
+                _ => "bg-secondary"
             };
         }
 

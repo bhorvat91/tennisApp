@@ -16,7 +16,11 @@
 
 @if (_isLoading)
 {
-    <p>Učitavanje klubova...</p>
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
 }
 else if (_clubs.Count == 0)
 {
@@ -24,34 +28,29 @@ else if (_clubs.Count == 0)
 }
 else
 {
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Naziv</th>
-                <th>Adresa</th>
-                <th>Status</th>
-                <th>Akcije</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var club in _clubs)
-            {
-                var membership = _membershipByClubId.GetValueOrDefault(club.Id);
-                var statusText = GetStatusText(membership);
-                <tr>
-                    <td><a href="@($"/clubs/{club.Id}")">@club.Name</a></td>
-                    <td>@(string.IsNullOrWhiteSpace(club.Address) ? "-" : club.Address)</td>
-                    <td>@statusText</td>
-                    <td>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+        @foreach (var club in _clubs)
+        {
+            var membership = _membershipByClubId.GetValueOrDefault(club.Id);
+            var statusText = GetStatusText(membership);
+            var badgeClass = GetStatusBadgeClass(membership);
+            <div class="col">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title"><a href="@($"/clubs/{club.Id}")" class="text-decoration-none stretched-link">@club.Name</a></h5>
+                        <p class="card-text text-muted small">@(string.IsNullOrWhiteSpace(club.Address) ? "Adresa nije navedena" : club.Address)</p>
+                    </div>
+                    <div class="card-footer d-flex justify-content-between align-items-center">
+                        <span class="badge @badgeClass">@statusText</span>
                         @if (membership is null)
                         {
-                            <button class="btn btn-sm btn-outline-primary" @onclick="() => JoinClubAsync(club.Id)">Pridruži se</button>
+                            <button class="btn btn-sm btn-outline-success" @onclick="() => JoinClubAsync(club.Id)">Pridruži se</button>
                         }
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
 }
 
 @code {
@@ -128,6 +127,18 @@ else
         {
             _errorMessage = $"Slanje zahtjeva nije uspjelo: {ex.Message}";
         }
+    }
+
+    private static string GetStatusBadgeClass(TennisHub.Core.Models.ClubMembership? membership)
+    {
+        if (membership is null) return "bg-secondary";
+        return membership.Status switch
+        {
+            TennisHub.Core.Enums.MembershipStatus.Pending => "bg-warning text-dark",
+            TennisHub.Core.Enums.MembershipStatus.Rejected => "bg-danger",
+            TennisHub.Core.Enums.MembershipStatus.Approved => "bg-success",
+            _ => "bg-secondary"
+        };
     }
 
     private static string GetStatusText(TennisHub.Core.Models.ClubMembership? membership)

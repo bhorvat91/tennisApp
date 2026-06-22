@@ -1,5 +1,13 @@
+:root {
+    --th-primary: #4a7c59;
+    --th-primary-dark: #3c6549;
+    --th-primary-light: #6b9b78;
+    --bs-primary: #4a7c59;
+    --bs-primary-rgb: 74, 124, 89;
+}
+
 html, body {
-    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
 h1:focus {
@@ -7,18 +15,34 @@ h1:focus {
 }
 
 a, .btn-link {
-    color: #0071c1;
+    color: var(--th-primary);
 }
 
 .btn-primary {
     color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
+    background-color: var(--th-primary);
+    border-color: var(--th-primary-dark);
 }
 
+    .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+        background-color: var(--th-primary-dark);
+        border-color: var(--th-primary-dark);
+    }
+
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
-  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem var(--th-primary-light);
 }
+
+/* Tennis-themed card wrapper. Mirrors Bootstrap's .card styling. */
+.th-card {
+    padding: 1.25rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    background-color: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+/* Use Bootstrap's .badge classes directly in components for status badges. */
 
 .content {
     padding-top: 1.1rem;
