@@ -1,0 +1,118 @@
+@page "/clubs/{ClubId:guid}/leagues"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IMembershipService MembershipService
+@inject ILeagueService LeagueService
+@inject NavigationManager Navigation
+
+<PageTitle>Lige</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
+}
+else if (!_hasAccess)
+{
+    <div class="alert alert-warning">Lige su dostupne samo odobrenim članovima kluba.</div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1 class="mb-0">Lige</h1>
+        @if (_isAdmin)
+        {
+            <a class="btn btn-primary" href="@($"/clubs/{ClubId}/leagues/new")">Nova liga</a>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+
+    @if (_leagues.Count == 0)
+    {
+        <p>Nema evidentiranih liga. @(_isAdmin ? "Kreirajte novu ligu." : "")</p>
+    }
+    else
+    {
+        <div class="row row-cols-1 row-cols-md-2 g-3 mb-3">
+            @foreach (var league in _leagues)
+            {
+                <div class="col">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <h5 class="card-title mb-1">@league.Name</h5>
+                                <span class="badge @(league.Status == "active" ? "bg-success" : "bg-secondary")">
+                                    @(league.Status == "active" ? "Aktivna" : "Završena")
+                                </span>
+                            </div>
+                            @if (!string.IsNullOrWhiteSpace(league.Season))
+                            {
+                                <p class="text-muted small mb-1">Sezona: @league.Season</p>
+                            }
+                            @if (!string.IsNullOrWhiteSpace(league.Description))
+                            {
+                                <p class="card-text">@league.Description</p>
+                            }
+                        </div>
+                        <div class="card-footer">
+                            <a class="btn btn-sm btn-outline-primary" href="@($"/clubs/{ClubId}/leagues/{league.Id}")">Detalji</a>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+
+    <a href="@($"/clubs/{ClubId}")" class="btn btn-outline-secondary">Natrag na klub</a>
+}
+
+@code {
+    [Parameter]
+    public Guid ClubId { get; set; }
+
+    private readonly List<TennisHub.Core.Models.League> _leagues = [];
+    private bool _isLoading = true;
+    private bool _hasAccess;
+    private bool _isAdmin;
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _leagues.Clear();
+
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        var membership = await MembershipService.GetMembershipAsync(ClubId, userId);
+        _hasAccess = membership?.Status == TennisHub.Core.Enums.MembershipStatus.Approved;
+        _isAdmin = _hasAccess && membership!.Role == TennisHub.Core.Enums.MembershipRole.Admin;
+
+        if (_hasAccess)
+        {
+            try
+            {
+                _leagues.AddRange(await LeagueService.GetLeaguesAsync(ClubId));
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Neuspješno učitavanje liga: {ex.Message}";
+            }
+        }
+
+        _isLoading = false;
+    }
+}

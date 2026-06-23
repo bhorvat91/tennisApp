@@ -1,0 +1,131 @@
+@page "/clubs/{ClubId:guid}/leagues/new"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IMembershipService MembershipService
+@inject ILeagueService LeagueService
+@inject NavigationManager Navigation
+
+<PageTitle>Nova liga</PageTitle>
+
+<h1>Nova liga</h1>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
+}
+else if (!_isAdmin)
+{
+    <div class="alert alert-warning">Kreiranje liga dostupno je samo administratorima kluba.</div>
+}
+else
+{
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+
+    <div class="card" style="max-width:500px">
+        <div class="card-body">
+            <EditForm Model="_model" OnValidSubmit="CreateAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="mb-3">
+                    <label class="form-label" for="league-name">Naziv *</label>
+                    <InputText id="league-name" class="form-control" @bind-Value="_model.Name" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="league-season">Sezona</label>
+                    <InputText id="league-season" class="form-control" @bind-Value="_model.Season" placeholder="npr. 2025/2026" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label" for="league-desc">Opis</label>
+                    <InputTextArea id="league-desc" class="form-control" rows="3" @bind-Value="_model.Description" />
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary" type="submit" disabled="@_isSaving">Kreiraj ligu</button>
+                    <a class="btn btn-outline-secondary" href="@($"/clubs/{ClubId}/leagues")">Odustani</a>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid ClubId { get; set; }
+
+    private readonly NewLeagueModel _model = new();
+    private bool _isLoading = true;
+    private bool _isAdmin;
+    private bool _isSaving;
+    private Guid _currentUserId;
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        _currentUserId = userId;
+
+        var membership = await MembershipService.GetMembershipAsync(ClubId, userId);
+        _isAdmin = membership?.Status == TennisHub.Core.Enums.MembershipStatus.Approved
+                   && membership.Role == TennisHub.Core.Enums.MembershipRole.Admin;
+
+        _isLoading = false;
+    }
+
+    private async Task CreateAsync()
+    {
+        _errorMessage = null;
+        _isSaving = true;
+
+        try
+        {
+            var league = await LeagueService.CreateLeagueAsync(
+                ClubId, _model.Name, _model.Description, _model.Season, _currentUserId);
+
+            if (league is null)
+            {
+                _errorMessage = "Kreiranje lige nije uspjelo.";
+                return;
+            }
+
+            Navigation.NavigateTo($"/clubs/{ClubId}/leagues/{league.Id}");
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kreiranje lige nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private sealed class NewLeagueModel
+    {
+        [System.ComponentModel.DataAnnotations.Required(ErrorMessage = "Naziv je obavezan.")]
+        [System.ComponentModel.DataAnnotations.StringLength(100, ErrorMessage = "Naziv može imati najviše 100 znakova.")]
+        public string Name { get; set; } = string.Empty;
+
+        public string? Season { get; set; }
+
+        public string? Description { get; set; }
+    }
+}

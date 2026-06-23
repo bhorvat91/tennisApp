@@ -1,0 +1,644 @@
+@page "/clubs/{ClubId:guid}/leagues/{LeagueId:guid}"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IMembershipService MembershipService
+@inject ILeagueService LeagueService
+@inject NavigationManager Navigation
+
+<PageTitle>@(_league?.Name ?? "Liga")</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
+}
+else if (_league is null)
+{
+    <div class="alert alert-warning">Liga nije pronađena.</div>
+}
+else if (!_hasAccess)
+{
+    <div class="alert alert-warning">Detalji liga dostupni su samo odobrenim članovima kluba.</div>
+}
+else
+{
+    <div class="d-flex justify-content-between align-items-start mb-1">
+        <h1 class="mb-0">@_league.Name</h1>
+        <span class="badge @(_league.Status == "active" ? "bg-success" : "bg-secondary") align-self-center">
+            @(_league.Status == "active" ? "Aktivna" : "Završena")
+        </span>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(_league.Season))
+    {
+        <p class="text-muted mb-1">Sezona: @_league.Season</p>
+    }
+    @if (!string.IsNullOrWhiteSpace(_league.Description))
+    {
+        <p class="mb-3">@_league.Description</p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <div class="alert alert-success">@_successMessage</div>
+    }
+
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <button class="nav-link @(_activeTab == Tab.Standings ? "active" : "")"
+                    @onclick='() => _activeTab = Tab.Standings'>Tablica</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(_activeTab == Tab.Matches ? "active" : "")"
+                    @onclick='() => _activeTab = Tab.Matches'>Mečevi</button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link @(_activeTab == Tab.Players ? "active" : "")"
+                    @onclick='() => _activeTab = Tab.Players'>Igrači (@_players.Count)</button>
+        </li>
+    </ul>
+
+    <!-- TAB: Standings -->
+    @if (_activeTab == Tab.Standings)
+    {
+        @if (_standings.Count == 0)
+        {
+            <p>Nema dovoljno podataka za tablicu. Igrači se trebaju prijaviti i odigrati mečeve.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover table-striped">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Igrač</th>
+                            <th>O</th>
+                            <th>P</th>
+                            <th>I</th>
+                            <th>Bodovi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var i = 0; i < _standings.Count; i++)
+                        {
+                            var row = _standings[i];
+                            <tr class="@(row.UserId == _currentUserId ? "table-success" : "")">
+                                <td>@(i + 1)</td>
+                                <td>@row.DisplayName @(row.UserId == _currentUserId ? "(ja)" : "")</td>
+                                <td>@row.Wins</td>
+                                <td>@row.Losses</td>
+                                <td>@row.Played</td>
+                                <td><strong>@row.Points</strong></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted small">O = pobjede, P = porazi, I = odigrano, Bodovi = 2×pobjede + 1×poraz</p>
+        }
+    }
+
+    <!-- TAB: Matches -->
+    @if (_activeTab == Tab.Matches)
+    {
+        @if (_isAdmin && _league.Status == "active")
+        {
+            <div class="card mb-3">
+                <div class="card-header">Dodaj meč</div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-4">
+                            <label class="form-label">Igrač 1</label>
+                            <select class="form-select" @bind="_newMatchPlayer1Id">
+                                <option value="">— odaberi —</option>
+                                @foreach (var p in _players)
+                                {
+                                    <option value="@p.UserId">@GetDisplayName(p.UserId)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Igrač 2</label>
+                            <select class="form-select" @bind="_newMatchPlayer2Id">
+                                <option value="">— odaberi —</option>
+                                @foreach (var p in _players)
+                                {
+                                    <option value="@p.UserId">@GetDisplayName(p.UserId)</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Datum (opt.)</label>
+                            <input type="date" class="form-control" @bind="_newMatchDate" />
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-primary w-100" @onclick="AddMatchAsync" disabled="@_isSaving">Dodaj</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+
+        @if (_matches.Count == 0)
+        {
+            <p>Nema zakazanih mečeva.</p>
+        }
+        else
+        {
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Igrač 1</th>
+                            <th>Igrač 2</th>
+                            <th>Datum</th>
+                            <th>Status</th>
+                            <th>Rezultat</th>
+                            <th>Akcija</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var match in _matches)
+                        {
+                            var result = _results.FirstOrDefault(r => r.MatchId == match.Id);
+                            var isMyMatch = match.Player1Id == _currentUserId || match.Player2Id == _currentUserId;
+                            <tr>
+                                <td>@GetDisplayName(match.Player1Id)</td>
+                                <td>@GetDisplayName(match.Player2Id)</td>
+                                <td>@(match.ScheduledDate.HasValue ? match.ScheduledDate.Value.ToString("dd.MM.yyyy.") : "-")</td>
+                                <td>
+                                    <span class="badge @GetMatchStatusBadge(match.Status)">
+                                        @GetMatchStatusText(match.Status)
+                                    </span>
+                                </td>
+                                <td>
+                                    @if (result is not null)
+                                    {
+                                        <span>@GetDisplayName(result.WinnerId) pobijedio</span>
+                                        @if (!string.IsNullOrWhiteSpace(result.Score))
+                                        {
+                                            <span class="text-muted"> (@result.Score)</span>
+                                        }
+                                    }
+                                    else
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                </td>
+                                <td>
+                                    @if (match.Status == "pending" && (isMyMatch || _isAdmin) && _league.Status == "active")
+                                    {
+                                        <button class="btn btn-sm btn-outline-success"
+                                                @onclick="() => OpenResultModal(match)">
+                                            Unesi rezultat
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+    }
+
+    <!-- TAB: Players -->
+    @if (_activeTab == Tab.Players)
+    {
+        @if (_league.Status == "active")
+        {
+            <div class="mb-3">
+                @if (_isJoined)
+                {
+                    <button class="btn btn-outline-danger" @onclick="WithdrawAsync" disabled="@_isSaving">
+                        Povuci prijavu
+                    </button>
+                }
+                else
+                {
+                    <button class="btn btn-success" @onclick="JoinAsync" disabled="@_isSaving">
+                        Prijavi se u ligu
+                    </button>
+                }
+            </div>
+        }
+
+        @if (_players.Count == 0)
+        {
+            <p>Nema prijavljenih igrača.</p>
+        }
+        else
+        {
+            <ul class="list-group">
+                @foreach (var player in _players)
+                {
+                    <li class="list-group-item @(player.UserId == _currentUserId ? "list-group-item-success" : "")">
+                        @GetDisplayName(player.UserId)
+                        @if (player.UserId == _currentUserId)
+                        {
+                            <span class="badge bg-success ms-2">ja</span>
+                        }
+                    </li>
+                }
+            </ul>
+        }
+    }
+
+    <div class="mt-4">
+        <a href="@($"/clubs/{ClubId}/leagues")" class="btn btn-outline-secondary">Natrag na liste liga</a>
+    </div>
+}
+
+<!-- Result modal -->
+@if (_showResultModal && _resultMatch is not null)
+{
+    <div class="schedule-modal-overlay" @onclick="CloseResultModal">
+        <div class="schedule-modal" @onclick:stopPropagation="true">
+            <h5 class="mb-3">Unos rezultata</h5>
+            <p>
+                <strong>@GetDisplayName(_resultMatch.Player1Id)</strong>
+                vs
+                <strong>@GetDisplayName(_resultMatch.Player2Id)</strong>
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(_modalError))
+            {
+                <div class="alert alert-danger py-2">@_modalError</div>
+            }
+
+            <div class="mb-3">
+                <label class="form-label">Pobjednik</label>
+                <select class="form-select" @bind="_resultWinnerId">
+                    <option value="">— odaberi —</option>
+                    <option value="@_resultMatch.Player1Id">@GetDisplayName(_resultMatch.Player1Id)</option>
+                    <option value="@_resultMatch.Player2Id">@GetDisplayName(_resultMatch.Player2Id)</option>
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Rezultat (npr. 6-3 6-4)</label>
+                <input type="text" class="form-control" placeholder="6-3 6-4" @bind="_resultScore" />
+            </div>
+
+            <div class="d-flex gap-2 justify-content-end">
+                <button class="btn btn-outline-secondary" @onclick="CloseResultModal" disabled="@_isSaving">Odustani</button>
+                <button class="btn btn-primary" @onclick="ConfirmResultAsync" disabled="@_isSaving">
+                    @if (_isSaving)
+                    {
+                        <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                    }
+                    Potvrdi
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid ClubId { get; set; }
+
+    [Parameter]
+    public Guid LeagueId { get; set; }
+
+    private TennisHub.Core.Models.League? _league;
+    private readonly List<TennisHub.Core.Models.LeaguePlayer> _players = [];
+    private readonly List<TennisHub.Core.Models.LeagueMatch> _matches = [];
+    private readonly List<TennisHub.Core.Models.LeagueMatchResult> _results = [];
+    private readonly List<StandingRow> _standings = [];
+    private bool _isLoading = true;
+    private bool _hasAccess;
+    private bool _isAdmin;
+    private bool _isJoined;
+    private bool _isSaving;
+    private Guid _currentUserId;
+    private Tab _activeTab = Tab.Standings;
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    // new match form
+    private string _newMatchPlayer1Id = string.Empty;
+    private string _newMatchPlayer2Id = string.Empty;
+    private DateTime? _newMatchDate;
+
+    // result modal
+    private bool _showResultModal;
+    private TennisHub.Core.Models.LeagueMatch? _resultMatch;
+    private string _resultWinnerId = string.Empty;
+    private string _resultScore = string.Empty;
+    private string? _modalError;
+
+    // player display name cache — placeholder using user IDs until profile lookup is available
+    private readonly Dictionary<Guid, string> _displayNames = [];
+
+    private enum Tab { Standings, Matches, Players }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _successMessage = null;
+        _players.Clear();
+        _matches.Clear();
+        _results.Clear();
+        _standings.Clear();
+        _displayNames.Clear();
+
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        _currentUserId = userId;
+
+        var membership = await MembershipService.GetMembershipAsync(ClubId, userId);
+        _hasAccess = membership?.Status == TennisHub.Core.Enums.MembershipStatus.Approved;
+        _isAdmin = _hasAccess && membership!.Role == TennisHub.Core.Enums.MembershipRole.Admin;
+
+        if (_hasAccess)
+        {
+            try
+            {
+                _league = await LeagueService.GetLeagueAsync(LeagueId);
+                if (_league is not null)
+                {
+                    await LoadLeagueDataAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Neuspješno učitavanje podataka: {ex.Message}";
+            }
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task LoadLeagueDataAsync()
+    {
+        var playersTask = LeagueService.GetLeaguePlayersAsync(LeagueId);
+        var matchesTask = LeagueService.GetMatchesAsync(LeagueId);
+        var resultsTask = LeagueService.GetMatchResultsAsync(LeagueId);
+
+        await Task.WhenAll(playersTask, matchesTask, resultsTask);
+
+        _players.AddRange(await playersTask);
+        _matches.AddRange(await matchesTask);
+        _results.AddRange(await resultsTask);
+
+        BuildDisplayNames();
+        BuildStandings();
+
+        _isJoined = _players.Any(p => p.UserId == _currentUserId);
+    }
+
+    private void BuildDisplayNames()
+    {
+        // Use short user ID fragment as display name placeholder
+        // Replace this with a real profile lookup when profiles are queryable
+        foreach (var player in _players)
+        {
+            if (!_displayNames.ContainsKey(player.UserId))
+            {
+                _displayNames[player.UserId] = $"Igrač {player.UserId.ToString()[..8]}";
+            }
+        }
+
+        // Ensure current user has a name
+        if (!_displayNames.ContainsKey(_currentUserId))
+        {
+            _displayNames[_currentUserId] = $"Igrač {_currentUserId.ToString()[..8]}";
+        }
+    }
+
+    private string GetDisplayName(Guid userId)
+        => _displayNames.TryGetValue(userId, out var name) ? name : userId.ToString()[..8];
+
+    private void BuildStandings()
+    {
+        _standings.Clear();
+        var dict = new Dictionary<Guid, StandingRow>();
+
+        foreach (var player in _players)
+        {
+            dict[player.UserId] = new StandingRow { UserId = player.UserId, DisplayName = GetDisplayName(player.UserId) };
+        }
+
+        foreach (var result in _results)
+        {
+            var match = _matches.FirstOrDefault(m => m.Id == result.MatchId);
+            if (match is null) continue;
+
+            var loserId = match.Player1Id == result.WinnerId ? match.Player2Id : match.Player1Id;
+
+            if (dict.TryGetValue(result.WinnerId, out var winnerRow))
+            {
+                winnerRow.Wins++;
+            }
+
+            if (dict.TryGetValue(loserId, out var loserRow))
+            {
+                loserRow.Losses++;
+            }
+        }
+
+        _standings.AddRange(dict.Values.OrderByDescending(r => r.Points).ThenByDescending(r => r.Wins));
+    }
+
+    private async Task JoinAsync()
+    {
+        _errorMessage = null;
+        _successMessage = null;
+        _isSaving = true;
+
+        try
+        {
+            var result = await LeagueService.JoinLeagueAsync(LeagueId, _currentUserId);
+            if (result is null)
+            {
+                _errorMessage = "Prijava u ligu nije uspjela.";
+                return;
+            }
+
+            _successMessage = "Uspješno ste se prijavili u ligu.";
+            _players.Clear();
+            _players.AddRange(await LeagueService.GetLeaguePlayersAsync(LeagueId));
+            BuildDisplayNames();
+            BuildStandings();
+            _isJoined = true;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Prijava u ligu nije uspjela: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task WithdrawAsync()
+    {
+        _errorMessage = null;
+        _successMessage = null;
+        _isSaving = true;
+
+        try
+        {
+            await LeagueService.WithdrawFromLeagueAsync(LeagueId, _currentUserId);
+            _successMessage = "Odjavljeni ste iz lige.";
+            _players.Clear();
+            _players.AddRange(await LeagueService.GetLeaguePlayersAsync(LeagueId));
+            BuildDisplayNames();
+            BuildStandings();
+            _isJoined = false;
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Odjava nije uspjela: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private async Task AddMatchAsync()
+    {
+        _errorMessage = null;
+        _successMessage = null;
+
+        if (!Guid.TryParse(_newMatchPlayer1Id, out var p1) || !Guid.TryParse(_newMatchPlayer2Id, out var p2))
+        {
+            _errorMessage = "Odaberite oba igrača.";
+            return;
+        }
+
+        if (p1 == p2)
+        {
+            _errorMessage = "Igrač 1 i Igrač 2 moraju biti različiti.";
+            return;
+        }
+
+        _isSaving = true;
+
+        try
+        {
+            var date = _newMatchDate.HasValue ? DateOnly.FromDateTime(_newMatchDate.Value) : (DateOnly?)null;
+            var match = await LeagueService.CreateMatchAsync(LeagueId, p1, p2, date);
+            if (match is null)
+            {
+                _errorMessage = "Kreiranje meča nije uspjelo.";
+                return;
+            }
+
+            _successMessage = "Meč je dodan.";
+            _newMatchPlayer1Id = string.Empty;
+            _newMatchPlayer2Id = string.Empty;
+            _newMatchDate = null;
+            _matches.Clear();
+            _matches.AddRange(await LeagueService.GetMatchesAsync(LeagueId));
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kreiranje meča nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private void OpenResultModal(TennisHub.Core.Models.LeagueMatch match)
+    {
+        _resultMatch = match;
+        _resultWinnerId = string.Empty;
+        _resultScore = string.Empty;
+        _modalError = null;
+        _showResultModal = true;
+    }
+
+    private void CloseResultModal()
+    {
+        _showResultModal = false;
+        _resultMatch = null;
+        _modalError = null;
+    }
+
+    private async Task ConfirmResultAsync()
+    {
+        if (_resultMatch is null) return;
+
+        if (!Guid.TryParse(_resultWinnerId, out var winnerId))
+        {
+            _modalError = "Odaberite pobjednika.";
+            return;
+        }
+
+        _isSaving = true;
+        _modalError = null;
+
+        try
+        {
+            var result = await LeagueService.EnterResultAsync(_resultMatch.Id, winnerId, _resultScore, _currentUserId);
+            if (result is null)
+            {
+                _modalError = "Unos rezultata nije uspio.";
+                return;
+            }
+
+            CloseResultModal();
+            _successMessage = "Rezultat je uspješno unesen.";
+
+            // Reload
+            _matches.Clear();
+            _matches.AddRange(await LeagueService.GetMatchesAsync(LeagueId));
+            _results.Clear();
+            _results.AddRange(await LeagueService.GetMatchResultsAsync(LeagueId));
+            BuildStandings();
+        }
+        catch (Exception ex)
+        {
+            _modalError = $"Unos rezultata nije uspio: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private static string GetMatchStatusBadge(string status) => status switch
+    {
+        "completed" => "bg-success",
+        "cancelled" => "bg-danger",
+        _ => "bg-warning text-dark"
+    };
+
+    private static string GetMatchStatusText(string status) => status switch
+    {
+        "completed" => "Završen",
+        "cancelled" => "Otkazan",
+        _ => "Na čekanju"
+    };
+
+    private sealed class StandingRow
+    {
+        public Guid UserId { get; init; }
+        public string DisplayName { get; init; } = string.Empty;
+        public int Wins { get; set; }
+        public int Losses { get; set; }
+        public int Played => Wins + Losses;
+        public int Points => Wins * 2 + Losses;
+    }
+}

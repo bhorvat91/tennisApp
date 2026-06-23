@@ -4,6 +4,7 @@
 @inject IMembershipService MembershipService
 @inject ICourtService CourtService
 @inject IBookingRuleService BookingRuleService
+@inject ILeagueService LeagueService
 @inject NavigationManager Navigation
 
 <PageTitle>Admin dashboard</PageTitle>
@@ -182,6 +183,62 @@ else
             </EditForm>
         </div>
     </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Lige</h5>
+            <a class="btn btn-sm btn-primary" href="@($"/clubs/{Id}/leagues/new")">Nova liga</a>
+        </div>
+        <div class="card-body">
+            @if (_leagues.Count == 0)
+            {
+                <p>Nema evidentiranih liga.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Naziv</th>
+                                <th>Sezona</th>
+                                <th>Status</th>
+                                <th>Akcije</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var league in _leagues)
+                            {
+                                <tr>
+                                    <td><a href="@($"/clubs/{Id}/leagues/{league.Id}")">@league.Name</a></td>
+                                    <td>@(string.IsNullOrWhiteSpace(league.Season) ? "-" : league.Season)</td>
+                                    <td>
+                                        <span class="badge @(league.Status == "active" ? "bg-success" : "bg-secondary")">
+                                            @(league.Status == "active" ? "Aktivna" : "Završena")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (league.Status == "active")
+                                        {
+                                            <button class="btn btn-sm btn-outline-secondary me-2"
+                                                    @onclick="() => FinishLeagueAsync(league)">Zatvori</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-success me-2"
+                                                    @onclick="() => ReactivateLeagueAsync(league)">Aktiviraj</button>
+                                        }
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                @onclick="() => DeleteLeagueAsync(league)">Obriši</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
 }
 
 @code {
@@ -191,6 +248,7 @@ else
     private readonly List<TennisHub.Core.Models.ClubMembership> _pendingMemberships = [];
     private readonly List<TennisHub.Core.Models.ClubMembership> _approvedMemberships = [];
     private readonly List<TennisHub.Core.Models.Court> _courts = [];
+    private readonly List<TennisHub.Core.Models.League> _leagues = [];
     private readonly CourtFormModel _courtModel = new();
     private readonly BookingRulesFormModel _bookingRulesModel = new();
     private bool _isLoading = true;
@@ -244,6 +302,9 @@ else
         _bookingRulesModel.MinHoursPerBooking = rules?.MinHoursPerBooking ?? 0.5m;
         _bookingRulesModel.MaxHoursPerBooking = rules?.MaxHoursPerBooking ?? 2;
         _bookingRulesModel.MaxAdvanceDays = rules?.MaxAdvanceDays ?? 7;
+
+        _leagues.Clear();
+        _leagues.AddRange(await LeagueService.GetLeaguesAsync(Id));
 
         _isLoading = false;
     }
@@ -377,6 +438,51 @@ else
         finally
         {
             _isSavingBookingRules = false;
+        }
+    }
+
+    private async Task FinishLeagueAsync(TennisHub.Core.Models.League league)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            await LeagueService.UpdateLeagueStatusAsync(league.Id, "finished");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Zatvaranje lige nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private async Task ReactivateLeagueAsync(TennisHub.Core.Models.League league)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            await LeagueService.UpdateLeagueStatusAsync(league.Id, "active");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Aktiviranje lige nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteLeagueAsync(TennisHub.Core.Models.League league)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            await LeagueService.DeleteLeagueAsync(league.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Brisanje lige nije uspjelo: {ex.Message}";
         }
     }
 
