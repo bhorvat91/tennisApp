@@ -8,7 +8,7 @@ Ovaj repository pokriva TennisHub MVP faze 1–5 (setup, auth, klubovi, admin od
 
 ## Supabase konfiguracija
 
-1. Uredi lokalnu datoteku `src/TennisHub.Web/wwwroot/appsettings.Development.json`:
+1. Uredi konfiguraciju u `src/TennisHub.Web/wwwroot/appsettings.json`:
 
 ```json
 {
@@ -19,7 +19,7 @@ Ovaj repository pokriva TennisHub MVP faze 1–5 (setup, auth, klubovi, admin od
 }
 ```
 
-2. U commitanom `appsettings.json` vrijednosti ostaju prazne (`""`).
+2. Ako koristiš drugi Supabase projekt ili okruženje, ažuriraj iste ključeve u toj datoteci.
 
 ## Baza podataka (Supabase)
 
