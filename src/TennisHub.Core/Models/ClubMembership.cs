@@ -23,6 +23,15 @@ public class ClubMembership : BaseModel
     [Column("status")]
     public string StatusValue { get; set; } = "pending";
 
+    [Column("membership_type")]
+    public string MembershipTypeValue { get; set; } = "member";
+
+    [Column("fee_paid")]
+    public bool FeePaid { get; set; } = false;
+
+    [Column("can_reserve")]
+    public bool CanReserve { get; set; } = true;
+
     [Column("joined_at")]
     public DateTime JoinedAt { get; set; }
 
@@ -35,4 +44,9 @@ public class ClubMembership : BaseModel
     public MembershipStatus Status => Enum.TryParse<MembershipStatus>(StatusValue, true, out var status)
         ? status
         : MembershipStatus.Pending;
+
+    [JsonIgnore]
+    public MembershipType MembershipType => Enum.TryParse<MembershipType>(MembershipTypeValue, true, out var type)
+        ? type
+        : MembershipType.Member;
 }

@@ -8,6 +8,7 @@ using TennisHub.Shared.Services.Clubs;
 using TennisHub.Shared.Services.Courts;
 using TennisHub.Shared.Services.Memberships;
 using TennisHub.Shared.Services.Leagues;
+using TennisHub.Shared.Services.Profiles;
 using TennisHub.Shared.Services.Reservations;
 
 namespace TennisHub.Shared.Extensions;
@@ -38,6 +39,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IBookingRuleService, BookingRuleService>();
         services.AddScoped<IReservationService, ReservationService>();
         services.AddScoped<ILeagueService, LeagueService>();
+        services.AddScoped<IProfileService, ProfileService>();
 
         return services;
     }

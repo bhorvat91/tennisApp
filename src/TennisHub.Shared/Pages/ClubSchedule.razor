@@ -20,7 +20,7 @@
 }
 else if (!_hasAccess)
 {
-    <div class="alert alert-warning">Raspored terena dostupan je samo odobrenim članovima kluba.</div>
+    <div class="alert alert-warning">Raspored terena dostupan je samo odobrenim članovima kluba koji imaju pravo rezervacije.</div>
 }
 else
 {
@@ -190,7 +190,8 @@ else
         _currentUserId = userId;
 
         var membership = await MembershipService.GetMembershipAsync(ClubId, userId);
-        _hasAccess = membership?.Status == TennisHub.Core.Enums.MembershipStatus.Approved;
+        _hasAccess = membership?.Status == TennisHub.Core.Enums.MembershipStatus.Approved
+            && (membership.Role == TennisHub.Core.Enums.MembershipRole.Admin || membership.CanReserve);
 
         if (_hasAccess)
         {

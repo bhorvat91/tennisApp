@@ -66,6 +66,14 @@ else
                     </div>
                 </div>
 
+                <div class="mb-3">
+                    <label class="form-label" for="league-third-set">Format 3. seta</label>
+                    <InputSelect id="league-third-set" class="form-select" @bind-Value="_model.ThirdSetFormat">
+                        <option value="normal">Normalan 3. set</option>
+                        <option value="super_tie_break">Super tie-break</option>
+                    </InputSelect>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button class="btn btn-primary" type="submit" disabled="@_isSaving">Kreiraj ligu</button>
                     <a class="btn btn-outline-secondary" href="@($"/clubs/{ClubId}/leagues")">Odustani</a>
@@ -116,7 +124,7 @@ else
         {
             var league = await LeagueService.CreateLeagueAsync(
                 ClubId, _model.Name, _model.Description, _model.Season, _currentUserId,
-                _model.PointsPerWin, _model.PointsPerLoss);
+                _model.PointsPerWin, _model.PointsPerLoss, _model.ThirdSetFormat);
 
             if (league is null)
             {
@@ -149,5 +157,7 @@ else
         public int PointsPerWin { get; set; } = 2;
 
         public int PointsPerLoss { get; set; } = 1;
+
+        public string ThirdSetFormat { get; set; } = "normal";
     }
 }

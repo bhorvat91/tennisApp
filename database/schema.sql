@@ -34,6 +34,9 @@ create table if not exists public.club_memberships (
   user_id uuid not null references auth.users(id) on delete cascade,
   role text not null default 'member' check (role in ('admin','member')),
   status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  membership_type text not null default 'member' check (membership_type in ('member','guest')),
+  fee_paid boolean not null default false,
+  can_reserve boolean not null default true,
   joined_at timestamptz not null default now(),
   unique (club_id, user_id)
 );

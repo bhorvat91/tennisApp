@@ -65,4 +65,21 @@ public class MembershipService(Supabase.Client client) : IMembershipService
 
         return result.Models.Count > 0;
     }
+
+    public async Task<bool> UpdateMembershipDetailsAsync(ClubMembership membership, string membershipType, bool feePaid, bool canReserve)
+    {
+        var options = new QueryOptions
+        {
+            Returning = QueryOptions.ReturnType.Representation
+        };
+
+        var result = await _client.From<ClubMembership>()
+            .Where(x => x.Id == membership.Id)
+            .Set(x => x.MembershipTypeValue, membershipType)
+            .Set(x => x.FeePaid, feePaid)
+            .Set(x => x.CanReserve, canReserve)
+            .Update(options);
+
+        return result.Models.Count > 0;
+    }
 }

@@ -5,6 +5,7 @@
 @inject IMembershipService MembershipService
 @inject IReservationService ReservationService
 @inject IBookingRuleService BookingRuleService
+@inject IProfileService ProfileService
 @inject NavigationManager Navigation
 
 <PageTitle>Rezervacija terena</PageTitle>
@@ -23,7 +24,7 @@ else if (_court is null)
 }
 else if (!_hasAccess)
 {
-    <div class="alert alert-warning">Rezervacija terena dostupna je samo odobrenim članovima kluba.</div>
+    <div class="alert alert-warning">Rezervacija terena dostupna je samo odobrenim članovima kluba koji imaju pravo rezervacije.</div>
 }
 else
 {
@@ -101,6 +102,7 @@ else
                     <tr>
                         <th>Početak</th>
                         <th>Kraj</th>
+                        <th>Igrač</th>
                         <th>Status</th>
                         <th>Akcija</th>
                     </tr>
@@ -111,6 +113,16 @@ else
                         <tr>
                             <td>@res.StartTime.ToLocalTime().ToString("HH:mm")</td>
                             <td>@res.EndTime.ToLocalTime().ToString("HH:mm")</td>
+                            <td>
+                                @if (res.UserId == _currentUserId)
+                                {
+                                    <strong>@GetReservationUserName(res.UserId) (ja)</strong>
+                                }
+                                else
+                                {
+                                    @GetReservationUserName(res.UserId)
+                                }
+                            </td>
                             <td>@(res.UserId == _currentUserId ? "Moja rezervacija" : "Rezervirano")</td>
                             <td>
                                 @if (res.UserId == _currentUserId)
@@ -141,6 +153,7 @@ else
     private TennisHub.Core.Models.Court? _court;
     private TennisHub.Core.Models.ClubBookingRule? _bookingRules;
     private readonly List<TennisHub.Core.Models.Reservation> _reservations = [];
+    private readonly Dictionary<Guid, string> _reservationUserNames = [];
     private readonly NewReservationModel _newModel = new();
     private bool _isLoading = true;
     private bool _isLoadingReservations;
@@ -170,7 +183,8 @@ else
         _currentUserId = userId;
 
         var membership = await MembershipService.GetMembershipAsync(ClubId, userId);
-        _hasAccess = membership?.Status == TennisHub.Core.Enums.MembershipStatus.Approved;
+        _hasAccess = membership?.Status == TennisHub.Core.Enums.MembershipStatus.Approved
+            && (membership.Role == TennisHub.Core.Enums.MembershipRole.Admin || membership.CanReserve);
 
         if (_hasAccess)
         {
@@ -194,6 +208,16 @@ else
         try
         {
             _reservations.AddRange(await ReservationService.GetReservationsForCourtAsync(CourtId, date));
+
+            var userIds = _reservations.Select(r => r.UserId).Append(_currentUserId).Distinct();
+            var profiles = await ProfileService.GetProfilesAsync(userIds);
+            _reservationUserNames.Clear();
+            foreach (var (userId, profile) in profiles)
+            {
+                _reservationUserNames[userId] = !string.IsNullOrWhiteSpace(profile.FullName)
+                    ? profile.FullName
+                    : userId.ToString()[..8];
+            }
         }
         catch (Exception ex)
         {
@@ -204,6 +228,9 @@ else
             _isLoadingReservations = false;
         }
     }
+
+    private string GetReservationUserName(Guid userId)
+        => _reservationUserNames.TryGetValue(userId, out var name) ? name : userId.ToString()[..8];
 
     private async Task OnViewDateChangedAsync(ChangeEventArgs e)
     {

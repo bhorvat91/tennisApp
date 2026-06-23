@@ -30,6 +30,9 @@ public class League : BaseModel
     [Column("points_per_loss")]
     public int PointsPerLoss { get; set; } = 1;
 
+    [Column("third_set_format")]
+    public string ThirdSetFormat { get; set; } = "normal";
+
     [Column("created_by")]
     public Guid CreatedBy { get; set; }
 

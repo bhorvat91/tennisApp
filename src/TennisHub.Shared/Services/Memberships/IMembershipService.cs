@@ -13,4 +13,6 @@ public interface IMembershipService
     Task<IReadOnlyList<ClubMembership>> GetApprovedMembershipsAsync(Guid clubId);
 
     Task<bool> UpdateMembershipStatusAsync(ClubMembership membership, string status);
+
+    Task<bool> UpdateMembershipDetailsAsync(ClubMembership membership, string membershipType, bool feePaid, bool canReserve);
 }

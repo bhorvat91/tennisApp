@@ -8,7 +8,7 @@ public interface ILeagueService
 
     Task<League?> GetLeagueAsync(Guid leagueId);
 
-    Task<League?> CreateLeagueAsync(Guid clubId, string name, string? description, string? season, Guid userId, int pointsPerWin = 2, int pointsPerLoss = 1);
+    Task<League?> CreateLeagueAsync(Guid clubId, string name, string? description, string? season, Guid userId, int pointsPerWin = 2, int pointsPerLoss = 1, string thirdSetFormat = "normal");
 
     Task<bool> UpdateLeagueStatusAsync(Guid leagueId, string status);
 

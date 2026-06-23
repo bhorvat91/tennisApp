@@ -3,6 +3,7 @@
 @inject IAuthService AuthService
 @inject IMembershipService MembershipService
 @inject ILeagueService LeagueService
+@inject IProfileService ProfileService
 @inject NavigationManager Navigation
 
 <PageTitle>@(_league?.Name ?? "Liga")</PageTitle>
@@ -36,6 +37,7 @@ else
         <p class="text-muted mb-1">Sezona: @_league.Season</p>
     }
     <p class="text-muted small mb-1">Bodovi: pobjeda = <strong>@_league.PointsPerWin</strong>, poraz = <strong>@_league.PointsPerLoss</strong></p>
+    <p class="text-muted small mb-3">Format 3. seta: <strong>@(_league.ThirdSetFormat == "super_tie_break" ? "Super tie-break" : "Normalan 3. set")</strong></p>
     @if (!string.IsNullOrWhiteSpace(_league.Description))
     {
         <p class="mb-3">@_league.Description</p>
@@ -398,29 +400,51 @@ else
         _matches.AddRange(await matchesTask);
         _results.AddRange(await resultsTask);
 
-        BuildDisplayNames();
+        var allUserIds = _players.Select(p => p.UserId)
+            .Concat(_matches.Select(m => m.Player1Id))
+            .Concat(_matches.Select(m => m.Player2Id))
+            .Append(_currentUserId)
+            .Distinct();
+
+        var profiles = await ProfileService.GetProfilesAsync(allUserIds);
+        BuildDisplayNames(profiles);
         BuildStandings();
 
         _isJoined = _players.Any(p => p.UserId == _currentUserId);
     }
 
-    private void BuildDisplayNames()
+    private void BuildDisplayNames(IReadOnlyDictionary<Guid, TennisHub.Core.Models.Profile> profiles)
     {
-        // Use short user ID fragment as display name placeholder
-        // Replace this with a real profile lookup when profiles are queryable
         foreach (var player in _players)
         {
             if (!_displayNames.ContainsKey(player.UserId))
             {
-                _displayNames[player.UserId] = $"Igrač {player.UserId.ToString()[..8]}";
+                _displayNames[player.UserId] = GetNameFromProfile(player.UserId, profiles);
             }
         }
 
-        // Ensure current user has a name
+        foreach (var match in _matches)
+        {
+            if (!_displayNames.ContainsKey(match.Player1Id))
+                _displayNames[match.Player1Id] = GetNameFromProfile(match.Player1Id, profiles);
+            if (!_displayNames.ContainsKey(match.Player2Id))
+                _displayNames[match.Player2Id] = GetNameFromProfile(match.Player2Id, profiles);
+        }
+
         if (!_displayNames.ContainsKey(_currentUserId))
         {
-            _displayNames[_currentUserId] = $"Igrač {_currentUserId.ToString()[..8]}";
+            _displayNames[_currentUserId] = GetNameFromProfile(_currentUserId, profiles);
         }
+    }
+
+    private static string GetNameFromProfile(Guid userId, IReadOnlyDictionary<Guid, TennisHub.Core.Models.Profile> profiles)
+    {
+        if (profiles.TryGetValue(userId, out var profile) && !string.IsNullOrWhiteSpace(profile.FullName))
+        {
+            return profile.FullName;
+        }
+
+        return $"Igrač {userId.ToString()[..8]}";
     }
 
     private string GetDisplayName(Guid userId)
@@ -484,7 +508,8 @@ else
             _successMessage = "Uspješno ste se prijavili u ligu.";
             _players.Clear();
             _players.AddRange(await LeagueService.GetLeaguePlayersAsync(LeagueId));
-            BuildDisplayNames();
+            var profiles = await ProfileService.GetProfilesAsync(_players.Select(p => p.UserId).Append(_currentUserId));
+            BuildDisplayNames(profiles);
             BuildStandings();
             _isJoined = true;
         }
@@ -510,7 +535,8 @@ else
             _successMessage = "Odjavljeni ste iz lige.";
             _players.Clear();
             _players.AddRange(await LeagueService.GetLeaguePlayersAsync(LeagueId));
-            BuildDisplayNames();
+            var profiles = await ProfileService.GetProfilesAsync(_players.Select(p => p.UserId).Append(_currentUserId));
+            BuildDisplayNames(profiles);
             BuildStandings();
             _isJoined = false;
         }

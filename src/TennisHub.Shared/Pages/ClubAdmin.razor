@@ -5,6 +5,7 @@
 @inject ICourtService CourtService
 @inject IBookingRuleService BookingRuleService
 @inject ILeagueService LeagueService
+@inject IProfileService ProfileService
 @inject NavigationManager Navigation
 
 <PageTitle>Admin dashboard</PageTitle>
@@ -52,7 +53,7 @@ else
                             @foreach (var membership in _pendingMemberships)
                             {
                                 <tr>
-                                    <td>@membership.UserId</td>
+                                    <td>@GetMemberName(membership.UserId)</td>
                                     <td>@membership.JoinedAt.ToLocalTime().ToString("dd.MM.yyyy. HH:mm")</td>
                                     <td>
                                         <button class="btn btn-sm btn-success me-2" @onclick='() => DecideAsync(membership, "approved")'>Odobri</button>
@@ -76,12 +77,85 @@ else
             }
             else
             {
-                <ul>
-                    @foreach (var membership in _approvedMemberships)
-                    {
-                        <li>@membership.UserId (@(membership.Role == TennisHub.Core.Enums.MembershipRole.Admin ? "admin" : "member"))</li>
-                    }
-                </ul>
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Ime i prezime</th>
+                                <th>Uloga</th>
+                                <th>Tip članstva</th>
+                                <th>Članarina</th>
+                                <th>Rezervacije</th>
+                                <th>Akcije</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var membership in _approvedMemberships)
+                            {
+                                <tr>
+                                    <td>@GetMemberName(membership.UserId)</td>
+                                    <td>@(membership.Role == TennisHub.Core.Enums.MembershipRole.Admin ? "Admin" : "Član")</td>
+                                    <td>
+                                        @if (_editingMembershipId == membership.Id)
+                                        {
+                                            <select class="form-select form-select-sm" @bind="_editMembershipType">
+                                                <option value="member">Član</option>
+                                                <option value="guest">Gost (samo liga)</option>
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            @(membership.MembershipTypeValue == "guest" ? "Gost (samo liga)" : "Član")
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (_editingMembershipId == membership.Id)
+                                        {
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input" id="fee-@membership.Id"
+                                                       @bind="_editFeePaid" />
+                                                <label class="form-check-label" for="fee-@membership.Id">Plaćena</label>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @(membership.FeePaid ? "bg-success" : "bg-warning text-dark")">
+                                                @(membership.FeePaid ? "Plaćena" : "Nije plaćena")
+                                            </span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (_editingMembershipId == membership.Id)
+                                        {
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input" id="res-@membership.Id"
+                                                       @bind="_editCanReserve" />
+                                                <label class="form-check-label" for="res-@membership.Id">Ima pravo</label>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @(membership.CanReserve ? "bg-success" : "bg-secondary")">
+                                                @(membership.CanReserve ? "Da" : "Ne")
+                                            </span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (_editingMembershipId == membership.Id)
+                                        {
+                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveMembershipDetailsAsync(membership)" disabled="@_isSavingMembership">Spremi</button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="CancelMembershipEdit">Odustani</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => EditMembership(membership)">Uredi</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
             }
         </div>
     </div>
@@ -251,11 +325,17 @@ else
     private readonly List<TennisHub.Core.Models.League> _leagues = [];
     private readonly CourtFormModel _courtModel = new();
     private readonly BookingRulesFormModel _bookingRulesModel = new();
+    private readonly Dictionary<Guid, string> _memberNames = [];
     private bool _isLoading = true;
     private bool _isAdmin;
     private bool _isSavingCourt;
     private bool _isSavingBookingRules;
+    private bool _isSavingMembership;
     private Guid? _editingCourtId;
+    private Guid? _editingMembershipId;
+    private string _editMembershipType = "member";
+    private bool _editFeePaid;
+    private bool _editCanReserve = true;
     private string? _errorMessage;
 
     protected override async Task OnParametersSetAsync()
@@ -294,6 +374,18 @@ else
 
         _approvedMemberships.Clear();
         _approvedMemberships.AddRange(await MembershipService.GetApprovedMembershipsAsync(Id));
+
+        _memberNames.Clear();
+        var allUserIds = _pendingMemberships.Select(m => m.UserId)
+            .Concat(_approvedMemberships.Select(m => m.UserId))
+            .Distinct();
+        var profiles = await ProfileService.GetProfilesAsync(allUserIds);
+        foreach (var (id, profile) in profiles)
+        {
+            _memberNames[id] = !string.IsNullOrWhiteSpace(profile.FullName)
+                ? profile.FullName
+                : id.ToString()[..8];
+        }
 
         _courts.Clear();
         _courts.AddRange(await CourtService.GetCourtsAsync(Id));
@@ -483,6 +575,53 @@ else
         catch (Exception ex)
         {
             _errorMessage = $"Brisanje lige nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private string GetMemberName(Guid userId)
+        => _memberNames.TryGetValue(userId, out var name) ? name : userId.ToString()[..8];
+
+    private void EditMembership(TennisHub.Core.Models.ClubMembership membership)
+    {
+        _editingMembershipId = membership.Id;
+        _editMembershipType = membership.MembershipTypeValue;
+        _editFeePaid = membership.FeePaid;
+        _editCanReserve = membership.CanReserve;
+        _errorMessage = null;
+    }
+
+    private void CancelMembershipEdit()
+    {
+        _editingMembershipId = null;
+        _errorMessage = null;
+    }
+
+    private async Task SaveMembershipDetailsAsync(TennisHub.Core.Models.ClubMembership membership)
+    {
+        _errorMessage = null;
+        _isSavingMembership = true;
+
+        try
+        {
+            var success = await MembershipService.UpdateMembershipDetailsAsync(
+                membership, _editMembershipType, _editFeePaid, _editCanReserve);
+
+            if (!success)
+            {
+                _errorMessage = "Spremanje podataka o članu nije uspjelo.";
+                return;
+            }
+
+            _editingMembershipId = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Spremanje podataka o članu nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isSavingMembership = false;
         }
     }
 
