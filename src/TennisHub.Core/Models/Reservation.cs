@@ -1,6 +1,6 @@
+using Newtonsoft.Json;
 using Supabase.Postgrest.Attributes;
 using Supabase.Postgrest.Models;
-using System.Text.Json.Serialization;
 using TennisHub.Core.Enums;
 
 namespace TennisHub.Core.Models;

@@ -68,8 +68,15 @@
 
         if (result.Success)
         {
-            AuthStateProvider.NotifyAuthenticationStateChangedAsync();
-            Navigation.NavigateTo("/clubs", true);
+            if (AuthService.CurrentUser is not null)
+            {
+                AuthStateProvider.NotifyAuthenticationStateChangedAsync();
+                Navigation.NavigateTo("/clubs", true);
+            }
+            else
+            {
+                Navigation.NavigateTo("/login", true);
+            }
         }
         else
         {

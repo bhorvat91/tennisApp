@@ -1,3 +1,4 @@
+using Newtonsoft.Json;
 using Supabase.Postgrest.Attributes;
 using Supabase.Postgrest.Models;
 using TennisHub.Core.Enums;
@@ -25,10 +26,12 @@ public class ClubMembership : BaseModel
     [Column("joined_at")]
     public DateTime JoinedAt { get; set; }
 
+    [JsonIgnore]
     public MembershipRole Role => Enum.TryParse<MembershipRole>(RoleValue, true, out var role)
         ? role
         : MembershipRole.Member;
 
+    [JsonIgnore]
     public MembershipStatus Status => Enum.TryParse<MembershipStatus>(StatusValue, true, out var status)
         ? status
         : MembershipStatus.Pending;
