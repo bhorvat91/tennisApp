@@ -164,6 +164,10 @@ else
 
                 <div class="row g-3 align-items-end mb-3">
                     <div class="col-md-3">
+                        <label class="form-label" for="min-hours">Min. sati po rezervaciji</label>
+                        <InputNumber id="min-hours" class="form-control" @bind-Value="_bookingRulesModel.MinHoursPerBooking" />
+                    </div>
+                    <div class="col-md-3">
                         <label class="form-label" for="max-hours">Maks. sati po rezervaciji</label>
                         <InputNumber id="max-hours" class="form-control" @bind-Value="_bookingRulesModel.MaxHoursPerBooking" />
                     </div>
@@ -237,6 +241,7 @@ else
         _courts.AddRange(await CourtService.GetCourtsAsync(Id));
 
         var rules = await BookingRuleService.GetRulesAsync(Id);
+        _bookingRulesModel.MinHoursPerBooking = rules?.MinHoursPerBooking ?? 0.5m;
         _bookingRulesModel.MaxHoursPerBooking = rules?.MaxHoursPerBooking ?? 2;
         _bookingRulesModel.MaxAdvanceDays = rules?.MaxAdvanceDays ?? 7;
 
@@ -353,6 +358,7 @@ else
         {
             var success = await BookingRuleService.UpdateRulesAsync(
                 Id,
+                _bookingRulesModel.MinHoursPerBooking,
                 _bookingRulesModel.MaxHoursPerBooking,
                 _bookingRulesModel.MaxAdvanceDays);
 
@@ -384,12 +390,25 @@ else
         public bool HasFloodlights { get; set; }
     }
 
-    private sealed class BookingRulesFormModel
+    private sealed class BookingRulesFormModel : IValidatableObject
     {
+        [Range(typeof(decimal), "0.5", "24", ErrorMessage = "Minimalno trajanje mora biti između 0.5 i 24 sata.")]
+        public decimal MinHoursPerBooking { get; set; } = 0.5m;
+
         [Range(typeof(decimal), "0.5", "24", ErrorMessage = "Maksimalno trajanje mora biti između 0.5 i 24 sata.")]
         public decimal MaxHoursPerBooking { get; set; } = 2;
 
         [Range(1, 365, ErrorMessage = "Maksimalni broj dana unaprijed mora biti između 1 i 365.")]
         public int MaxAdvanceDays { get; set; } = 7;
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (MinHoursPerBooking > MaxHoursPerBooking)
+            {
+                yield return new ValidationResult(
+                    "Minimalno trajanje ne može biti veće od maksimalnog trajanja.",
+                    [nameof(MinHoursPerBooking), nameof(MaxHoursPerBooking)]);
+            }
+        }
     }
 }

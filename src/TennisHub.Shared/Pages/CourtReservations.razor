@@ -35,6 +35,7 @@ else
     {
         <p>
             <strong>Pravila kluba:</strong>
+            min. @_bookingRules.MinHoursPerBooking h po rezervaciji,
             maks. @_bookingRules.MaxHoursPerBooking h po rezervaciji,
             maks. @_bookingRules.MaxAdvanceDays dana unaprijed.
         </p>
@@ -242,6 +243,21 @@ else
             if (endUtc <= startUtc)
             {
                 _errorMessage = "Kraj rezervacije mora biti nakon početka.";
+                return;
+            }
+
+            var durationHours = (decimal)(endUtc - startUtc).TotalHours;
+            var minHours = _bookingRules?.MinHoursPerBooking ?? 0.5m;
+            var maxHours = _bookingRules?.MaxHoursPerBooking ?? 24m;
+            if (durationHours < minHours)
+            {
+                _errorMessage = $"Minimalno trajanje rezervacije je {minHours:0.##} h.";
+                return;
+            }
+
+            if (durationHours > maxHours)
+            {
+                _errorMessage = $"Maksimalno trajanje rezervacije je {maxHours:0.##} h.";
                 return;
             }
 

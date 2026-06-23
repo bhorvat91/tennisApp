@@ -1,5 +1,6 @@
 using Supabase.Postgrest.Attributes;
 using Supabase.Postgrest.Models;
+using System.Text.Json.Serialization;
 using TennisHub.Core.Enums;
 
 namespace TennisHub.Core.Models;
@@ -31,6 +32,7 @@ public class Reservation : BaseModel
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 
+    [JsonIgnore]
     public ReservationStatus Status => Enum.TryParse<ReservationStatus>(StatusValue, true, out var s)
         ? s
         : ReservationStatus.Confirmed;

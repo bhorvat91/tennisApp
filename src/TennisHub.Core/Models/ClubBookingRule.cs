@@ -13,6 +13,9 @@ public class ClubBookingRule : BaseModel
     [Column("max_hours_per_booking")]
     public decimal MaxHoursPerBooking { get; set; }
 
+    [Column("min_hours_per_booking")]
+    public decimal MinHoursPerBooking { get; set; }
+
     [Column("max_advance_days")]
     public int MaxAdvanceDays { get; set; }
 }

@@ -58,6 +58,7 @@ create table if not exists public.courts (
 -- ------------------------------------------------------------
 create table if not exists public.club_booking_rules (
   club_id uuid primary key references public.clubs(id) on delete cascade,
+  min_hours_per_booking numeric not null default 0.5,
   max_hours_per_booking numeric not null default 2,
   max_advance_days integer not null default 7
 );
@@ -163,16 +164,22 @@ security definer
 set search_path = public
 as $$
 declare
+  v_min_hours numeric;
   v_max_hours numeric;
   v_max_advance_days integer;
   v_conflict_count integer;
 begin
   select club_id into new.club_id from public.courts where id = new.court_id;
 
-  select max_hours_per_booking, max_advance_days
-    into v_max_hours, v_max_advance_days
+  select min_hours_per_booking, max_hours_per_booking, max_advance_days
+    into v_min_hours, v_max_hours, v_max_advance_days
     from public.club_booking_rules
     where club_id = new.club_id;
+
+  if v_min_hours is not null
+     and (extract(epoch from (new.end_time - new.start_time)) / 3600.0) < v_min_hours then
+    raise exception 'Rezervacija je kraca od minimalno dozvoljenog trajanja od % sati', v_min_hours;
+  end if;
 
   if v_max_hours is not null
      and (extract(epoch from (new.end_time - new.start_time)) / 3600.0) > v_max_hours then

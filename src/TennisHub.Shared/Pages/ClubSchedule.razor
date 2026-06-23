@@ -87,12 +87,13 @@ else
                 <dt class="col-5">Početak</dt>
                 <dd class="col-7">@_pendingSlot.Start.ToString("HH:mm")</dd>
                 <dt class="col-5">Kraj</dt>
-                <dd class="col-7">@_pendingSlot.End.ToString("HH:mm")</dd>
+                <dd class="col-7">@GetSelectedEndLocal(_pendingSlot).ToString("HH:mm")</dd>
             </dl>
 
             @if (_bookingRules is not null)
             {
                 <p class="text-muted small mb-3">
+                    Min. @_bookingRules.MinHoursPerBooking h po rezervaciji,
                     Maks. @_bookingRules.MaxHoursPerBooking h po rezervaciji,
                     maks. @_bookingRules.MaxAdvanceDays dana unaprijed.
                 </p>
@@ -102,6 +103,16 @@ else
             {
                 <div class="alert alert-danger py-2">@_modalError</div>
             }
+
+            <div class="mb-3">
+                <label class="form-label" for="booking-duration">Trajanje</label>
+                <select id="booking-duration" class="form-select" @bind="_selectedDurationHours">
+                    @foreach (var option in _durationOptions)
+                    {
+                        <option value="@option">@FormatDuration(option)</option>
+                    }
+                </select>
+            </div>
 
             <div class="d-flex gap-2 justify-content-end">
                 <button class="btn btn-outline-secondary" @onclick="CloseModal" disabled="@_isCreating">Odustani</button>
@@ -137,6 +148,8 @@ else
     private bool _isCreating;
     private string? _modalError;
     private CourtTimelineGrid.SlotClickedArgs? _pendingSlot;
+    private decimal _selectedDurationHours;
+    private readonly List<decimal> _durationOptions = [];
 
     // ── Croatian day / month names for header ─────────────────────────────────
 
@@ -146,6 +159,8 @@ else
     private static readonly string[] MonthNames =
         ["siječnja", "veljače", "ožujka", "travnja", "svibnja", "lipnja",
          "srpnja", "kolovoza", "rujna", "listopada", "studenoga", "prosinca"];
+
+    private static readonly TimeOnly ScheduleEndTime = new(22, 0);
 
     private static string FormatDate(DateOnly date)
     {
@@ -231,6 +246,35 @@ else
     private void HandleSlotClicked(CourtTimelineGrid.SlotClickedArgs args)
     {
         _pendingSlot = args;
+        _durationOptions.Clear();
+
+        var minHours = _bookingRules?.MinHoursPerBooking ?? 0.5m;
+        var maxHours = _bookingRules?.MaxHoursPerBooking ?? 24m;
+        if (maxHours < minHours)
+        {
+            _modalError = "Pravila rezervacije nisu ispravno postavljena (min > max).";
+            _showModal = true;
+            return;
+        }
+
+        var maxByRule = Math.Floor(maxHours * 2) / 2m;
+        var minByRule = Math.Ceiling(minHours * 2) / 2m;
+        var maxByAvailability = GetMaxAvailableHours(args.CourtId, args.Start);
+        var effectiveMax = Math.Min(maxByRule, maxByAvailability);
+
+        for (var duration = minByRule; duration <= effectiveMax; duration += 0.5m)
+        {
+            _durationOptions.Add(duration);
+        }
+
+        if (_durationOptions.Count == 0)
+        {
+            _modalError = "Za odabrani termin nema slobodnog trajanja koje zadovoljava pravila kluba.";
+            _showModal = true;
+            return;
+        }
+
+        _selectedDurationHours = _durationOptions[0];
         _modalError = null;
         _showModal = true;
     }
@@ -240,6 +284,7 @@ else
         _showModal = false;
         _pendingSlot = null;
         _modalError = null;
+        _durationOptions.Clear();
     }
 
     private async Task ConfirmBookingAsync()
@@ -252,7 +297,13 @@ else
         try
         {
             var startUtc = _pendingSlot.Start.ToUniversalTime();
-            var endUtc   = _pendingSlot.End.ToUniversalTime();
+            if (!_durationOptions.Contains(_selectedDurationHours))
+            {
+                _modalError = "Odabrano trajanje nije dostupno za ovaj termin.";
+                return;
+            }
+
+            var endUtc = GetSelectedEndLocal(_pendingSlot).ToUniversalTime();
 
             // Determine club_id via the court
             var court = _courts.FirstOrDefault(c => c.Id == _pendingSlot.CourtId);
@@ -271,7 +322,7 @@ else
                 return;
             }
 
-            _successMessage = $"Rezervacija za {_pendingSlot.CourtName} u {_pendingSlot.Start:HH:mm} je uspješno kreirana.";
+            _successMessage = $"Rezervacija za {_pendingSlot.CourtName} ({_pendingSlot.Start:HH:mm} - {GetSelectedEndLocal(_pendingSlot):HH:mm}) je uspješno kreirana.";
             CloseModal();
             await LoadReservationsAsync(_selectedDate);
         }
@@ -284,4 +335,24 @@ else
             _isCreating = false;
         }
     }
+
+    private DateTime GetSelectedEndLocal(CourtTimelineGrid.SlotClickedArgs slot)
+        => slot.Start.AddMinutes((double)_selectedDurationHours * 60);
+
+    private decimal GetMaxAvailableHours(Guid courtId, DateTime slotStartLocal)
+    {
+        var scheduleEndLocal = _selectedDate.ToDateTime(ScheduleEndTime, DateTimeKind.Local);
+        var nextReservationStart = _reservations
+            .Where(x => x.CourtId == courtId)
+            .Select(x => x.StartTime.ToLocalTime())
+            .Where(x => x > slotStartLocal)
+            .DefaultIfEmpty(scheduleEndLocal)
+            .Min();
+
+        var maxMinutes = Math.Max(0, (nextReservationStart - slotStartLocal).TotalMinutes);
+        return Math.Floor((decimal)(maxMinutes / 30)) / 2m;
+    }
+
+    private static string FormatDuration(decimal hours)
+        => $"{hours:0.##} h";
 }

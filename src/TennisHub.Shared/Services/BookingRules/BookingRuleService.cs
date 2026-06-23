@@ -13,7 +13,7 @@ public class BookingRuleService(Supabase.Client client) : IBookingRuleService
             .Single();
     }
 
-    public async Task<bool> UpdateRulesAsync(Guid clubId, decimal maxHoursPerBooking, int maxAdvanceDays)
+    public async Task<bool> UpdateRulesAsync(Guid clubId, decimal minHoursPerBooking, decimal maxHoursPerBooking, int maxAdvanceDays)
     {
         var rule = await _client.From<ClubBookingRule>()
             .Where(x => x.ClubId == clubId)
@@ -24,6 +24,7 @@ public class BookingRuleService(Supabase.Client client) : IBookingRuleService
             var createResult = await _client.From<ClubBookingRule>().Insert(new ClubBookingRule
             {
                 ClubId = clubId,
+                MinHoursPerBooking = minHoursPerBooking,
                 MaxHoursPerBooking = maxHoursPerBooking,
                 MaxAdvanceDays = maxAdvanceDays
             });
@@ -31,6 +32,7 @@ public class BookingRuleService(Supabase.Client client) : IBookingRuleService
             return createResult.Model is not null;
         }
 
+        rule.MinHoursPerBooking = minHoursPerBooking;
         rule.MaxHoursPerBooking = maxHoursPerBooking;
         rule.MaxAdvanceDays = maxAdvanceDays;
 
