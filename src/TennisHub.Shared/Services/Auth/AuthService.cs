@@ -24,11 +24,20 @@ public class AuthService(Supabase.Client client, IJSRuntime jsRuntime) : IAuthSe
         }
 
         await _client.InitializeAsync();
-        var storedSession = await LoadSessionAsync();
+        StoredSession? storedSession = null;
 
-        if (_client.Auth.CurrentSession is null && storedSession is not null)
+        try
         {
-            await _client.Auth.SetSession(storedSession.AccessToken, storedSession.RefreshToken, true);
+            storedSession = await LoadSessionAsync();
+
+            if (_client.Auth.CurrentSession is null && storedSession is not null)
+            {
+                await _client.Auth.SetSession(storedSession.AccessToken, storedSession.RefreshToken, true);
+            }
+        }
+        catch
+        {
+            await ClearPersistedSessionAsync();
         }
 
         _initialized = true;
@@ -78,7 +87,7 @@ public class AuthService(Supabase.Client client, IJSRuntime jsRuntime) : IAuthSe
     public async Task SignOutAsync()
     {
         await _client.Auth.SignOut();
-        await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", SessionStorageKey);
+        await ClearPersistedSessionAsync();
         RaiseAuthStateChanged();
     }
 
@@ -101,6 +110,9 @@ public class AuthService(Supabase.Client client, IJSRuntime jsRuntime) : IAuthSe
             ? null
             : JsonSerializer.Deserialize<StoredSession>(json);
     }
+
+    private ValueTask ClearPersistedSessionAsync() =>
+        _jsRuntime.InvokeVoidAsync("localStorage.removeItem", SessionStorageKey);
 
     private void RaiseAuthStateChanged() => AuthStateChanged?.Invoke();
 

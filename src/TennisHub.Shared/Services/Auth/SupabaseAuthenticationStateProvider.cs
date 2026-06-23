@@ -23,7 +23,9 @@ public class SupabaseAuthenticationStateProvider(IAuthService authService) : Aut
             new(ClaimTypes.Email, user.Email ?? string.Empty)
         };
 
-        if (user.UserMetadata.TryGetValue("full_name", out var fullNameObject) && fullNameObject is not null)
+        if (user.UserMetadata is not null
+            && user.UserMetadata.TryGetValue("full_name", out var fullNameObject)
+            && fullNameObject is not null)
         {
             claims.Add(new Claim(ClaimTypes.Name, fullNameObject.ToString() ?? user.Email ?? user.Id ?? string.Empty));
         }
