@@ -22,6 +22,21 @@ public class ReservationService(Supabase.Client client) : IReservationService
         return response.Models;
     }
 
+    public async Task<IReadOnlyList<Reservation>> GetReservationsForClubAsync(Guid clubId, DateOnly date)
+    {
+        var startOfDay = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+        var endOfDay = date.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+
+        var response = await _client.From<Reservation>()
+            .Where(x => x.ClubId == clubId && x.StatusValue == "confirmed")
+            .Filter("start_time", Constants.Operator.GreaterThanOrEqual, startOfDay.ToString("o"))
+            .Filter("start_time", Constants.Operator.LessThanOrEqual, endOfDay.ToString("o"))
+            .Order(x => x.StartTime, Constants.Ordering.Ascending)
+            .Get();
+
+        return response.Models;
+    }
+
     public async Task<IReadOnlyList<Reservation>> GetMyReservationsForCourtAsync(Guid courtId, Guid userId, DateOnly date)
     {
         var startOfDay = date.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);

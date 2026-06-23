@@ -124,9 +124,180 @@ a, .btn-link {
         content: var(--blazor-load-percentage-text, "Loading");
     }
 
+
+/* ---- Court Schedule / Timeline ------------------------------------------ */
+
+.schedule-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+}
+
+.schedule-table {
+    min-width: 400px;
+}
+
+/* Sticky header row */
+.schedule-header-row {
+    display: flex;
+    border-bottom: 2px solid #dee2e6;
+    background: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.time-gutter-header {
+    width: 64px;
+    flex-shrink: 0;
+    padding: 0.5rem 0.4rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #6c757d;
+    border-right: 1px solid #dee2e6;
+}
+
+.court-header-cell {
+    flex: 1;
+    min-width: 160px;
+    padding: 0.5rem;
+    text-align: center;
+    font-weight: 600;
+    border-left: 1px solid #dee2e6;
+}
+
+/* Body row: time gutter + court columns side by side */
+.schedule-body {
+    display: flex;
+    flex-direction: row;
+}
+
+.time-gutter-col {
+    width: 64px;
+    flex-shrink: 0;
+    border-right: 1px solid #dee2e6;
+}
+
+.time-label-cell {
+    height: 48px;
+    display: flex;
+    align-items: flex-start;
+    padding: 3px 6px 0;
+    box-sizing: border-box;
+}
+
+.time-label-cell.full-hour {
+    border-top: 1px solid #dee2e6;
+}
+
+.time-label-cell.half-hour {
+    border-top: 1px dashed #ececec;
+}
+
+.time-label-text {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.time-label-half {
+    font-size: 0.75rem;
+    color: #bbb;
+}
+
+/* Court columns */
+.court-col {
+    flex: 1;
+    min-width: 160px;
+    position: relative;
+    border-left: 1px solid #dee2e6;
+}
+
+/* Individual time-slot rows (background grid + click targets) */
+.time-slot {
+    position: absolute;
+    width: 100%;
+    height: 48px;
+    box-sizing: border-box;
+    z-index: 1;
+}
+
+.time-slot.full-hour {
+    border-top: 1px solid #dee2e6;
+}
+
+.time-slot.half-hour {
+    border-top: 1px dashed #ececec;
+}
+
+.time-slot.free-slot {
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.time-slot.free-slot:hover {
+    background-color: rgba(74, 124, 89, 0.09);
+}
+
+/* Reservation blocks overlaid on court columns */
+.reservation-block {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    border-radius: 5px;
+    padding: 4px 8px;
+    overflow: hidden;
+    font-size: 0.78rem;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.reservation-block.own-reservation {
+    background-color: var(--th-primary);
+    color: #fff;
+    border: 1px solid var(--th-primary-dark);
+}
+
+.reservation-block.other-reservation {
+    background-color: #5b9bd5;
+    color: #fff;
+    border: 1px solid #4a8ac4;
+}
+
+.res-time {
+    display: block;
+    font-weight: 600;
+}
+
+.res-label {
+    display: block;
+    font-size: 0.72rem;
+    opacity: 0.9;
+}
+
 code {
     color: #c02d76;
 }
+.schedule-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+}
+
+.schedule-modal {
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);
+}
+
 
 .form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
     color: var(--bs-secondary-color);

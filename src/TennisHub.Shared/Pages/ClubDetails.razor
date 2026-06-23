@@ -70,6 +70,11 @@ else
         </div>
     }
 
+    @if (_hasCourtAccess)
+    {
+        <a class="btn btn-outline-success me-2" href="@($"/clubs/{Id}/schedule")">Raspored terena</a>
+    }
+
     @if (_isAdmin)
     {
         <a class="btn btn-outline-primary" href="@($"/clubs/{Id}/admin")">Admin dashboard</a>

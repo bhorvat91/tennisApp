@@ -6,6 +6,8 @@ public interface IReservationService
 {
     Task<IReadOnlyList<Reservation>> GetReservationsForCourtAsync(Guid courtId, DateOnly date);
 
+    Task<IReadOnlyList<Reservation>> GetReservationsForClubAsync(Guid clubId, DateOnly date);
+
     Task<IReadOnlyList<Reservation>> GetMyReservationsForCourtAsync(Guid courtId, Guid userId, DateOnly date);
 
     Task<Reservation?> CreateReservationAsync(Guid courtId, Guid clubId, Guid userId, DateTime startTime, DateTime endTime);
