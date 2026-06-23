@@ -116,9 +116,15 @@ create table if not exists public.courts (
 -- ------------------------------------------------------------
 create table if not exists public.club_booking_rules (
   club_id uuid primary key references public.clubs(id) on delete cascade,
+  min_hours_per_booking numeric not null default 0.5,
   max_hours_per_booking numeric not null default 2,
   max_advance_days integer not null default 7
 );
+
+alter table if exists public.club_booking_rules
+  add column if not exists min_hours_per_booking numeric not null default 0.5,
+  add column if not exists max_hours_per_booking numeric not null default 2,
+  add column if not exists max_advance_days integer not null default 7;
 
 -- ------------------------------------------------------------
 -- reservations

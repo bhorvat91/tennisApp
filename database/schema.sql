@@ -63,6 +63,11 @@ create table if not exists public.club_booking_rules (
   max_advance_days integer not null default 7
 );
 
+alter table if exists public.club_booking_rules
+  add column if not exists min_hours_per_booking numeric not null default 0.5,
+  add column if not exists max_hours_per_booking numeric not null default 2,
+  add column if not exists max_advance_days integer not null default 7;
+
 -- ------------------------------------------------------------
 -- reservations
 -- ------------------------------------------------------------

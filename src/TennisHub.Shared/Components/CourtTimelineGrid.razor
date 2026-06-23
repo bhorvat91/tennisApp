@@ -50,13 +50,15 @@
                         var isOccupied = courtReservations.Any(r =>
                             r.StartTime.ToLocalTime() < slotEnd &&
                             r.EndTime.ToLocalTime() > slotStart);
+                        var canFitMinimumDuration = GetMaxAvailableHours(courtReservations, slotStart) >= MinBookingHours;
+                        var previewEnd = slotStart.AddMinutes((double)Math.Max(MinBookingHours, 0.5m) * 60);
                         var topPx = i * SlotHeightPx;
                         var isHour = slot.Minute == 0;
                         var capturedCourt = court;
                         var capturedStart = slotStart;
-                        var capturedEnd = slotEnd;
+                        var capturedPreviewEnd = previewEnd;
 
-                        @if (isOccupied)
+                        @if (isOccupied || !canFitMinimumDuration)
                         {
                             <div class="time-slot @(isHour ? "full-hour" : "half-hour")"
                                  style="top: @(topPx)px"></div>
@@ -65,8 +67,8 @@
                         {
                             <div class="time-slot free-slot @(isHour ? "full-hour" : "half-hour")"
                                  style="top: @(topPx)px"
-                                 title="Rezerviraj @capturedStart.ToString("HH:mm") – @capturedEnd.ToString("HH:mm")"
-                                 @onclick="() => RaiseSlotClicked(capturedCourt.Id, capturedCourt.Name, capturedStart, capturedEnd)">
+                                 title="Rezerviraj @capturedStart.ToString("HH:mm") – @capturedPreviewEnd.ToString("HH:mm")"
+                                 @onclick="() => RaiseSlotClicked(capturedCourt.Id, capturedCourt.Name, capturedStart, capturedPreviewEnd)">
                             </div>
                         }
                     }
@@ -113,6 +115,9 @@
     public Guid CurrentUserId { get; set; }
 
     [Parameter]
+    public decimal MinBookingHours { get; set; } = 0.5m;
+
+    [Parameter]
     public EventCallback<SlotClickedArgs> OnSlotClicked { get; set; }
 
     // ── Constants ─────────────────────────────────────────────────────────────
@@ -141,6 +146,19 @@
         var startMin = Math.Max(localStart.Hour * 60 + localStart.Minute, StartHour * 60);
         var endMin   = Math.Min(localEnd.Hour   * 60 + localEnd.Minute,   EndHour   * 60);
         return Math.Max(SlotHeightPx, (endMin - startMin) * SlotHeightPx / 30);
+    }
+
+    private static decimal GetMaxAvailableHours(IEnumerable<Reservation> courtReservations, DateTime slotStartLocal)
+    {
+        var scheduleEndLocal = slotStartLocal.Date.AddHours(EndHour);
+        var nextReservationStart = courtReservations
+            .Select(x => x.StartTime.ToLocalTime())
+            .Where(x => x > slotStartLocal)
+            .DefaultIfEmpty(scheduleEndLocal)
+            .Min();
+
+        var maxMinutes = Math.Max(0, (nextReservationStart - slotStartLocal).TotalMinutes);
+        return Math.Floor((decimal)(maxMinutes / 30)) / 2m;
     }
 
     private Task RaiseSlotClicked(Guid courtId, string courtName, DateTime start, DateTime end)
