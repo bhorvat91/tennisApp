@@ -35,6 +35,7 @@ else
     {
         <p class="text-muted mb-1">Sezona: @_league.Season</p>
     }
+    <p class="text-muted small mb-1">Bodovi: pobjeda = <strong>@_league.PointsPerWin</strong>, poraz = <strong>@_league.PointsPerLoss</strong></p>
     @if (!string.IsNullOrWhiteSpace(_league.Description))
     {
         <p class="mb-3">@_league.Description</p>
@@ -102,7 +103,7 @@ else
                     </tbody>
                 </table>
             </div>
-            <p class="text-muted small">O = pobjede, P = porazi, I = odigrano, Bodovi = 2×pobjede + 1×poraz</p>
+            <p class="text-muted small">O = pobjede, P = porazi, I = odigrano, Bodovi = @(_league!.PointsPerWin)×pobjede + @(_league.PointsPerLoss)×poraz</p>
         }
     }
 
@@ -430,9 +431,18 @@ else
         _standings.Clear();
         var dict = new Dictionary<Guid, StandingRow>();
 
+        int ppw = _league?.PointsPerWin ?? 2;
+        int ppl = _league?.PointsPerLoss ?? 1;
+
         foreach (var player in _players)
         {
-            dict[player.UserId] = new StandingRow { UserId = player.UserId, DisplayName = GetDisplayName(player.UserId) };
+            dict[player.UserId] = new StandingRow
+            {
+                UserId = player.UserId,
+                DisplayName = GetDisplayName(player.UserId),
+                PointsPerWin = ppw,
+                PointsPerLoss = ppl
+            };
         }
 
         foreach (var result in _results)
@@ -636,9 +646,11 @@ else
     {
         public Guid UserId { get; init; }
         public string DisplayName { get; init; } = string.Empty;
+        public int PointsPerWin { get; init; } = 2;
+        public int PointsPerLoss { get; init; } = 1;
         public int Wins { get; set; }
         public int Losses { get; set; }
         public int Played => Wins + Losses;
-        public int Points => Wins * 2 + Losses;
+        public int Points => Wins * PointsPerWin + Losses * PointsPerLoss;
     }
 }

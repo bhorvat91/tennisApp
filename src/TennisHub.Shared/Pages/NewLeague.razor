@@ -49,6 +49,23 @@ else
                     <InputTextArea id="league-desc" class="form-control" rows="3" @bind-Value="_model.Description" />
                 </div>
 
+                <div class="row g-3 mb-3">
+                    <div class="col-sm-6">
+                        <label class="form-label" for="league-win-pts">Bodovi za pobjedu</label>
+                        <InputSelect id="league-win-pts" class="form-select" @bind-Value="_model.PointsPerWin">
+                            <option value="2">2 boda</option>
+                            <option value="3">3 boda</option>
+                        </InputSelect>
+                    </div>
+                    <div class="col-sm-6">
+                        <label class="form-label" for="league-loss-pts">Bodovi za poraz</label>
+                        <InputSelect id="league-loss-pts" class="form-select" @bind-Value="_model.PointsPerLoss">
+                            <option value="0">0 bodova</option>
+                            <option value="1">1 bod</option>
+                        </InputSelect>
+                    </div>
+                </div>
+
                 <div class="d-flex gap-2">
                     <button class="btn btn-primary" type="submit" disabled="@_isSaving">Kreiraj ligu</button>
                     <a class="btn btn-outline-secondary" href="@($"/clubs/{ClubId}/leagues")">Odustani</a>
@@ -98,7 +115,8 @@ else
         try
         {
             var league = await LeagueService.CreateLeagueAsync(
-                ClubId, _model.Name, _model.Description, _model.Season, _currentUserId);
+                ClubId, _model.Name, _model.Description, _model.Season, _currentUserId,
+                _model.PointsPerWin, _model.PointsPerLoss);
 
             if (league is null)
             {
@@ -127,5 +145,9 @@ else
         public string? Season { get; set; }
 
         public string? Description { get; set; }
+
+        public int PointsPerWin { get; set; } = 2;
+
+        public int PointsPerLoss { get; set; } = 1;
     }
 }

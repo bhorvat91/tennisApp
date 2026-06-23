@@ -24,7 +24,7 @@ public class LeagueService(Supabase.Client client) : ILeagueService
             .Single();
     }
 
-    public async Task<League?> CreateLeagueAsync(Guid clubId, string name, string? description, string? season, Guid userId)
+    public async Task<League?> CreateLeagueAsync(Guid clubId, string name, string? description, string? season, Guid userId, int pointsPerWin = 2, int pointsPerLoss = 1)
     {
         var league = new League
         {
@@ -33,6 +33,8 @@ public class LeagueService(Supabase.Client client) : ILeagueService
             Description = string.IsNullOrWhiteSpace(description) ? null : description,
             Season = string.IsNullOrWhiteSpace(season) ? null : season,
             Status = "active",
+            PointsPerWin = pointsPerWin,
+            PointsPerLoss = pointsPerLoss,
             CreatedBy = userId
         };
 

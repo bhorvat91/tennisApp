@@ -24,6 +24,12 @@ public class League : BaseModel
     [Column("status")]
     public string Status { get; set; } = "active";
 
+    [Column("points_per_win")]
+    public int PointsPerWin { get; set; } = 2;
+
+    [Column("points_per_loss")]
+    public int PointsPerLoss { get; set; } = 1;
+
     [Column("created_by")]
     public Guid CreatedBy { get; set; }
 
