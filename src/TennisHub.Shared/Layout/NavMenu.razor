@@ -3,10 +3,13 @@
 @inject SupabaseAuthenticationStateProvider AuthStateProvider
 @inject NavigationManager Navigation
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-success border-bottom mb-3">
+<nav class="navbar navbar-expand-lg th-navbar border-bottom mb-3">
     <div class="container-fluid">
-        <a class="navbar-brand" href="/">🎾 TennisHub</a>
-        <div class="navbar-nav">
+        <a class="navbar-brand th-brand" href="/">
+            <span class="th-brand-ball" aria-hidden="true"></span>
+            <span>TennisHub</span>
+        </a>
+        <div class="navbar-nav ms-auto th-nav-links">
             <AuthorizeView>
                 <Authorized>
                     <a class="nav-link" href="/clubs">Klubovi</a>

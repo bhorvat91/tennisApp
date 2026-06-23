@@ -1,33 +1,120 @@
 :root {
-    --th-primary: #4a7c59;
-    --th-primary-dark: #3c6549;
-    --th-primary-light: #6b9b78;
-    --bs-primary: #4a7c59;
-    --bs-primary-rgb: 74, 124, 89;
+    --th-primary: #1d7f48;
+    --th-primary-dark: #146338;
+    --th-primary-light: #32a362;
+    --th-accent: #d8ff5d;
+    --th-ink: #1b2a22;
+    --th-surface: #f7faf8;
+    --th-surface-card: #ffffff;
+    --bs-primary: #1d7f48;
+    --bs-primary-rgb: 29, 127, 72;
 }
 
 html, body {
     font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: var(--th-ink);
+    background: radial-gradient(circle at 10% 10%, rgba(216, 255, 93, 0.15), transparent 38%),
+                radial-gradient(circle at 90% 0%, rgba(29, 127, 72, 0.14), transparent 32%),
+                linear-gradient(180deg, #f9fcfa 0%, #f3f8f5 100%);
 }
 
 h1:focus {
     outline: none;
 }
 
+h1, h2, h3, h4, h5 {
+    color: #143325;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
 a, .btn-link {
     color: var(--th-primary);
 }
 
+a:hover, .btn-link:hover {
+    color: var(--th-primary-dark);
+}
+
+.th-app-shell {
+    min-height: calc(100vh - 70px);
+    padding-bottom: 1.25rem;
+}
+
+.th-main-content {
+    position: relative;
+}
+
+.th-main-content::before {
+    content: "";
+    position: absolute;
+    inset: -1rem -0.6rem auto;
+    height: 110px;
+    z-index: -1;
+    border-radius: 18px;
+    background: linear-gradient(120deg, rgba(20, 99, 56, 0.12), rgba(216, 255, 93, 0.2));
+    filter: blur(0.3px);
+}
+
+.th-navbar {
+    background: linear-gradient(120deg, #0f4d2d, #1d7f48 70%, #239556);
+    box-shadow: 0 10px 28px rgba(17, 60, 37, 0.24);
+}
+
+.th-brand {
+    color: #fff !important;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    letter-spacing: 0.01em;
+}
+
+.th-brand-ball {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #f2ffb8 0%, #ddff67 65%, #c7eb4d 100%);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2), inset -2px -2px 0 rgba(0, 0, 0, 0.08);
+}
+
+.th-nav-links .nav-link {
+    color: rgba(255, 255, 255, 0.9) !important;
+    border-radius: 999px;
+    padding: 0.4rem 0.85rem !important;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.th-nav-links .nav-link:hover,
+.th-nav-links .nav-link:focus {
+    color: #fff !important;
+    background-color: rgba(255, 255, 255, 0.16);
+}
+
 .btn-primary {
     color: #fff;
-    background-color: var(--th-primary);
+    background: linear-gradient(135deg, var(--th-primary) 0%, var(--th-primary-dark) 100%);
     border-color: var(--th-primary-dark);
+    box-shadow: 0 6px 16px rgba(20, 99, 56, 0.22);
 }
 
     .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
         background-color: var(--th-primary-dark);
         border-color: var(--th-primary-dark);
     }
+
+.btn-outline-success,
+.btn-outline-primary,
+.btn-outline-info {
+    border-width: 1.5px;
+    border-radius: 999px;
+}
+
+.btn-outline-success:hover,
+.btn-outline-primary:hover,
+.btn-outline-info:hover {
+    transform: translateY(-1px);
+}
 
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem var(--th-primary-light);
@@ -36,16 +123,62 @@ a, .btn-link {
 /* Tennis-themed card wrapper. Mirrors Bootstrap's .card styling. */
 .th-card {
     padding: 1.25rem;
-    border-radius: 0.5rem;
-    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
-    background-color: #fff;
-    border: 1px solid rgba(0, 0, 0, 0.125);
+    border-radius: 0.9rem;
+    box-shadow: 0 12px 28px rgba(19, 59, 36, 0.08);
+    background-color: var(--th-surface-card);
+    border: 1px solid rgba(28, 98, 58, 0.14);
 }
 
 /* Use Bootstrap's .badge classes directly in components for status badges. */
 
 .content {
     padding-top: 1.1rem;
+}
+
+.card {
+    border-radius: 0.95rem;
+    border: 1px solid rgba(28, 98, 58, 0.12);
+    box-shadow: 0 10px 30px rgba(24, 69, 44, 0.08);
+    background-color: var(--th-surface-card);
+}
+
+.card .card-title {
+    color: #153627;
+    font-weight: 700;
+}
+
+.card-footer {
+    background-color: rgba(248, 253, 250, 0.88);
+    border-top: 1px solid rgba(28, 98, 58, 0.1);
+}
+
+.form-control {
+    border-radius: 0.7rem;
+    border: 1px solid rgba(28, 98, 58, 0.22);
+}
+
+.form-control:focus {
+    border-color: rgba(29, 127, 72, 0.6);
+}
+
+.table {
+    --bs-table-bg: transparent;
+    border-radius: 0.9rem;
+    overflow: hidden;
+}
+
+.table > :not(caption) > * > * {
+    padding: 0.8rem 0.75rem;
+}
+
+.table-hover > tbody > tr:hover > * {
+    background-color: rgba(216, 255, 93, 0.15);
+}
+
+.badge {
+    border-radius: 999px;
+    font-weight: 600;
+    padding: 0.4em 0.72em;
 }
 
 .valid.modified:not([type=checkbox]) {
