@@ -24,6 +24,21 @@ else if (!_hasAccess)
 }
 else
 {
+    <!-- Club selector (shown when user is a member of more than one club) -->
+    @if (_myClubs.Count > 1)
+    {
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <label class="form-label mb-0 fw-semibold" for="club-selector">Klub:</label>
+            <select id="club-selector" class="form-select form-select-sm w-auto"
+                    value="@ClubId" @onchange="OnClubChanged">
+                @foreach (var club in _myClubs)
+                {
+                    <option value="@club.Id" selected="@(club.Id == ClubId)">@club.Name</option>
+                }
+            </select>
+        </div>
+    }
+
     <!-- Date navigation header -->
     <div class="d-flex flex-column align-items-center mb-3">
         <h1 class="fs-5 fw-bold text-uppercase mb-2 letter-spacing-1">
@@ -135,6 +150,7 @@ else
 
     private readonly List<TennisHub.Core.Models.Court> _courts = [];
     private readonly List<TennisHub.Core.Models.Reservation> _reservations = [];
+    private readonly List<TennisHub.Core.Models.Club> _myClubs = [];
     private TennisHub.Core.Models.ClubBookingRule? _bookingRules;
     private bool _isLoading = true;
     private bool _isLoadingReservations;
@@ -189,9 +205,25 @@ else
 
         _currentUserId = userId;
 
-        var membership = await MembershipService.GetMembershipAsync(ClubId, userId);
+        var membershipTask = MembershipService.GetMembershipAsync(ClubId, userId);
+        var allMembershipsTask = ClubService.GetCurrentUserMembershipsAsync(userId);
+        var allClubsTask = ClubService.GetClubsAsync();
+
+        await Task.WhenAll(membershipTask, allMembershipsTask, allClubsTask);
+
+        var membership = await membershipTask;
         _hasAccess = membership?.Status == TennisHub.Core.Enums.MembershipStatus.Approved
             && (membership.Role == TennisHub.Core.Enums.MembershipRole.Admin || membership.CanReserve);
+
+        var allMemberships = await allMembershipsTask;
+        var allClubs = await allClubsTask;
+        var approvedClubIds = allMemberships
+            .Where(m => m.Status == TennisHub.Core.Enums.MembershipStatus.Approved)
+            .Select(m => m.ClubId)
+            .ToHashSet();
+
+        _myClubs.Clear();
+        _myClubs.AddRange(allClubs.Where(c => approvedClubIds.Contains(c.Id)));
 
         if (_hasAccess)
         {
@@ -208,6 +240,14 @@ else
         }
 
         _isLoading = false;
+    }
+
+    private void OnClubChanged(ChangeEventArgs e)
+    {
+        if (Guid.TryParse(e.Value?.ToString(), out var newClubId) && newClubId != ClubId)
+        {
+            Navigation.NavigateTo($"/clubs/{newClubId}/schedule");
+        }
     }
 
     private async Task LoadReservationsAsync(DateOnly date)

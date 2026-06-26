@@ -1,9 +1,39 @@
 @page "/"
 @inject NavigationManager Navigation
+@inject IAuthService AuthService
+@inject IProfileService ProfileService
+@inject IMembershipService MembershipService
 
 @code {
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        try
+        {
+            var profile = await ProfileService.GetProfileAsync(userId);
+            if (profile?.DefaultClubId.HasValue == true)
+            {
+                var membership = await MembershipService.GetMembershipAsync(profile.DefaultClubId.Value, userId);
+                if (membership?.Status == TennisHub.Core.Enums.MembershipStatus.Approved)
+                {
+                    Navigation.NavigateTo($"/clubs/{profile.DefaultClubId.Value}/schedule", true);
+                    return;
+                }
+            }
+        }
+        catch
+        {
+            // Fall through to default redirect on any error
+        }
+
         Navigation.NavigateTo("/clubs", true);
     }
 }

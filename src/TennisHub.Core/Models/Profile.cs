@@ -15,6 +15,15 @@ public class Profile : BaseModel
     [Column("phone")]
     public string? Phone { get; set; }
 
+    [Column("default_club_id")]
+    public Guid? DefaultClubId { get; set; }
+
+    [Column("avatar_url")]
+    public string? AvatarUrl { get; set; }
+
+    [Column("racket")]
+    public string? Racket { get; set; }
+
     [Column("created_at")]
     public DateTime CreatedAt { get; set; }
 }

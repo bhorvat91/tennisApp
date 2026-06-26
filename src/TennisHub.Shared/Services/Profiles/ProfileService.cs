@@ -28,4 +28,23 @@ public class ProfileService(Supabase.Client client) : IProfileService
             .Where(x => x.Id == userId)
             .Single();
     }
+
+    public async Task<bool> UpdateProfileAsync(Guid userId, string? fullName, string? phone, Guid? defaultClubId, string? avatarUrl, string? racket)
+    {
+        var options = new QueryOptions
+        {
+            Returning = QueryOptions.ReturnType.Representation
+        };
+
+        var query = _client.From<Profile>()
+            .Where(x => x.Id == userId)
+            .Set(x => x.FullName, fullName)!
+            .Set(x => x.Phone, phone)!
+            .Set(x => x.DefaultClubId, defaultClubId)!
+            .Set(x => x.AvatarUrl, avatarUrl)!
+            .Set(x => x.Racket, racket);
+
+        var result = await query.Update(options);
+        return result.Models.Count > 0;
+    }
 }

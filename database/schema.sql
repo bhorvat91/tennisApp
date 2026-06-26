@@ -11,6 +11,9 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text,
   phone text,
+  default_club_id uuid references public.clubs(id) on delete set null,
+  avatar_url text,
+  racket text,
   created_at timestamptz not null default now()
 );
 
