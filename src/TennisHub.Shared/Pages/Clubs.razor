@@ -44,7 +44,7 @@ else
                         <span class="badge @badgeClass">@statusText</span>
                         @if (membership is null)
                         {
-                            <button class="btn btn-sm btn-outline-success" @onclick="() => JoinClubAsync(club.Id)">Pridruži se</button>
+                            <button class="btn btn-sm btn-outline-success" style="position: relative; z-index: 2" @onclick="() => JoinClubAsync(club.Id)">Pridruži se</button>
                         }
                     </div>
                 </div>

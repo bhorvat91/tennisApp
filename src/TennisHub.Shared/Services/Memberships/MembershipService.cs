@@ -18,7 +18,12 @@ public class MembershipService(Supabase.Client client) : IMembershipService
             StatusValue = "pending"
         };
 
-        var result = await _client.From<ClubMembership>().Insert(membership);
+        var options = new QueryOptions
+        {
+            Returning = QueryOptions.ReturnType.Representation
+        };
+
+        var result = await _client.From<ClubMembership>().Insert(membership, options);
         return result.Model is not null;
     }
 
