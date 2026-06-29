@@ -243,6 +243,11 @@ using (
     where cm1.user_id = auth.uid() and cm1.status = 'approved'
       and cm2.user_id = profiles.id and cm2.status = 'approved'
   )
+  or exists (
+    select 1 from public.club_memberships cm
+    where cm.user_id = profiles.id
+      and public.is_club_admin(cm.club_id)
+  )
 );
 create policy "profiles_insert_own" on public.profiles for insert with check (id = auth.uid());
 create policy "profiles_update_own" on public.profiles for update using (id = auth.uid());
