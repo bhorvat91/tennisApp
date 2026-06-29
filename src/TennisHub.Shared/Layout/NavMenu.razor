@@ -1,0 +1,36 @@
+@using Microsoft.AspNetCore.Components.Authorization
+@inject IAuthService AuthService
+@inject SupabaseAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<nav class="navbar navbar-expand-lg th-navbar border-bottom mb-3">
+    <div class="container-fluid">
+        <a class="navbar-brand th-brand" href="/">
+            <span class="th-brand-ball" aria-hidden="true"></span>
+            <span>TennisHub</span>
+        </a>
+        <div class="navbar-nav ms-auto th-nav-links">
+            <AuthorizeView>
+                <Authorized>
+                    <a class="nav-link" href="/clubs">Klubovi</a>
+                    <a class="nav-link" href="/clubs/new">Novi klub</a>
+                    <a class="nav-link" href="/profile">Profil</a>
+                    <button type="button" class="btn btn-link nav-link" @onclick="LogOutAsync">Odjava</button>
+                </Authorized>
+                <NotAuthorized>
+                    <a class="nav-link" href="/login">Prijava</a>
+                    <a class="nav-link" href="/register">Registracija</a>
+                </NotAuthorized>
+            </AuthorizeView>
+        </div>
+    </div>
+</nav>
+
+@code {
+    private async Task LogOutAsync()
+    {
+        await AuthService.SignOutAsync();
+        AuthStateProvider.NotifyAuthenticationStateChangedAsync();
+        Navigation.NavigateTo("/login", true);
+    }
+}

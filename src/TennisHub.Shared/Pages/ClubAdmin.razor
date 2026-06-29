@@ -1,0 +1,659 @@
+@page "/clubs/{Id:guid}/admin"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IMembershipService MembershipService
+@inject ICourtService CourtService
+@inject IBookingRuleService BookingRuleService
+@inject ILeagueService LeagueService
+@inject IProfileService ProfileService
+@inject NavigationManager Navigation
+
+<PageTitle>Admin dashboard</PageTitle>
+
+<h1>Admin dashboard</h1>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
+}
+else if (!_isAdmin)
+{
+    <div class="alert alert-warning">Nemate administratorska prava za ovaj klub.</div>
+}
+else
+{
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Zahtjevi na čekanju</h5></div>
+        <div class="card-body">
+            @if (_pendingMemberships.Count == 0)
+            {
+                <p>Nema zahtjeva na čekanju.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Korisnik</th>
+                                <th>Datum zahtjeva</th>
+                                <th>Akcije</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var membership in _pendingMemberships)
+                            {
+                                <tr>
+                                    <td>@GetMemberName(membership.UserId)</td>
+                                    <td>@membership.JoinedAt.ToLocalTime().ToString("dd.MM.yyyy. HH:mm")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-success me-2" @onclick='() => DecideAsync(membership, "approved")'>Odobri</button>
+                                        <button class="btn btn-sm btn-danger" @onclick='() => DecideAsync(membership, "rejected")'>Odbij</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Odobreni članovi</h5></div>
+        <div class="card-body">
+            @if (_approvedMemberships.Count == 0)
+            {
+                <p>Nema odobrenih članova.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Ime i prezime</th>
+                                <th>Uloga</th>
+                                <th>Tip članstva</th>
+                                <th>Članarina</th>
+                                <th>Rezervacije</th>
+                                <th>Akcije</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var membership in _approvedMemberships)
+                            {
+                                <tr>
+                                    <td>@GetMemberName(membership.UserId)</td>
+                                    <td>@(membership.Role == TennisHub.Core.Enums.MembershipRole.Admin ? "Admin" : "Član")</td>
+                                    <td>
+                                        @if (_editingMembershipId == membership.Id)
+                                        {
+                                            <select class="form-select form-select-sm" @bind="_editMembershipType">
+                                                <option value="member">Član</option>
+                                                <option value="guest">Gost (samo liga)</option>
+                                            </select>
+                                        }
+                                        else
+                                        {
+                                            @(membership.MembershipTypeValue == "guest" ? "Gost (samo liga)" : "Član")
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (_editingMembershipId == membership.Id)
+                                        {
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input" id="fee-@membership.Id"
+                                                       @bind="_editFeePaid" />
+                                                <label class="form-check-label" for="fee-@membership.Id">Plaćena</label>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @(membership.FeePaid ? "bg-success" : "bg-warning text-dark")">
+                                                @(membership.FeePaid ? "Plaćena" : "Nije plaćena")
+                                            </span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (_editingMembershipId == membership.Id)
+                                        {
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input" id="res-@membership.Id"
+                                                       @bind="_editCanReserve" />
+                                                <label class="form-check-label" for="res-@membership.Id">Ima pravo</label>
+                                            </div>
+                                        }
+                                        else
+                                        {
+                                            <span class="badge @(membership.CanReserve ? "bg-success" : "bg-secondary")">
+                                                @(membership.CanReserve ? "Da" : "Ne")
+                                            </span>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (_editingMembershipId == membership.Id)
+                                        {
+                                            <button class="btn btn-sm btn-success me-1" @onclick="() => SaveMembershipDetailsAsync(membership)" disabled="@_isSavingMembership">Spremi</button>
+                                            <button class="btn btn-sm btn-outline-secondary" @onclick="CancelMembershipEdit">Odustani</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-primary" @onclick="() => EditMembership(membership)">Uredi</button>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Tereni</h5></div>
+        <div class="card-body">
+            <EditForm Model="_courtModel" OnValidSubmit="SaveCourtAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label" for="court-name">Naziv</label>
+                        <InputText id="court-name" class="form-control" @bind-Value="_courtModel.Name" />
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" for="court-surface">Podloga</label>
+                        <InputText id="court-surface" class="form-control" @bind-Value="_courtModel.SurfaceType" />
+                    </div>
+                    <div class="col-md-2">
+                        <div class="form-check mb-2">
+                            <InputCheckbox id="court-floodlights" class="form-check-input" @bind-Value="_courtModel.HasFloodlights" />
+                            <label class="form-check-label" for="court-floodlights">Reflektori</label>
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary me-2" type="submit" disabled="@_isSavingCourt">
+                            @(_editingCourtId.HasValue ? "Spremi izmjene" : "Dodaj teren")
+                        </button>
+                        @if (_editingCourtId.HasValue)
+                        {
+                            <button class="btn btn-outline-secondary" type="button" @onclick="CancelCourtEdit">Odustani</button>
+                        }
+                    </div>
+                </div>
+            </EditForm>
+
+            @if (_courts.Count == 0)
+            {
+                <p>Nema evidentiranih terena.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Naziv</th>
+                                <th>Podloga</th>
+                                <th>Reflektori</th>
+                                <th>Akcije</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var court in _courts)
+                            {
+                                <tr>
+                                    <td>@court.Name</td>
+                                    <td>@(string.IsNullOrWhiteSpace(court.SurfaceType) ? "-" : court.SurfaceType)</td>
+                                    <td>@(court.HasFloodlights ? "Da" : "Ne")</td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary me-2" type="button" @onclick="() => EditCourt(court)">Uredi</button>
+                                        <button class="btn btn-sm btn-outline-danger" type="button" @onclick="() => DeleteCourtAsync(court)">Obriši</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header"><h5 class="mb-0">Pravila rezervacije</h5></div>
+        <div class="card-body">
+            <EditForm Model="_bookingRulesModel" OnValidSubmit="SaveBookingRulesAsync">
+                <DataAnnotationsValidator />
+                <ValidationSummary />
+
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label" for="min-hours">Min. sati po rezervaciji</label>
+                        <InputNumber id="min-hours" class="form-control" @bind-Value="_bookingRulesModel.MinHoursPerBooking" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="max-hours">Maks. sati po rezervaciji</label>
+                        <InputNumber id="max-hours" class="form-control" @bind-Value="_bookingRulesModel.MaxHoursPerBooking" />
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label" for="max-days">Maks. dana unaprijed</label>
+                        <InputNumber id="max-days" class="form-control" @bind-Value="_bookingRulesModel.MaxAdvanceDays" />
+                    </div>
+                    <div class="col-md-2">
+                        <button class="btn btn-primary" type="submit" disabled="@_isSavingBookingRules">Spremi pravila</button>
+                    </div>
+                </div>
+            </EditForm>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Lige</h5>
+            <a class="btn btn-sm btn-primary" href="@($"/clubs/{Id}/leagues/new")">Nova liga</a>
+        </div>
+        <div class="card-body">
+            @if (_leagues.Count == 0)
+            {
+                <p>Nema evidentiranih liga.</p>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Naziv</th>
+                                <th>Sezona</th>
+                                <th>Status</th>
+                                <th>Akcije</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var league in _leagues)
+                            {
+                                <tr>
+                                    <td><a href="@($"/clubs/{Id}/leagues/{league.Id}")">@league.Name</a></td>
+                                    <td>@(string.IsNullOrWhiteSpace(league.Season) ? "-" : league.Season)</td>
+                                    <td>
+                                        <span class="badge @(league.Status == "active" ? "bg-success" : "bg-secondary")">
+                                            @(league.Status == "active" ? "Aktivna" : "Završena")
+                                        </span>
+                                    </td>
+                                    <td>
+                                        @if (league.Status == "active")
+                                        {
+                                            <button class="btn btn-sm btn-outline-secondary me-2"
+                                                    @onclick="() => FinishLeagueAsync(league)">Zatvori</button>
+                                        }
+                                        else
+                                        {
+                                            <button class="btn btn-sm btn-outline-success me-2"
+                                                    @onclick="() => ReactivateLeagueAsync(league)">Aktiviraj</button>
+                                        }
+                                        <button class="btn btn-sm btn-outline-danger"
+                                                @onclick="() => DeleteLeagueAsync(league)">Obriši</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private readonly List<TennisHub.Core.Models.ClubMembership> _pendingMemberships = [];
+    private readonly List<TennisHub.Core.Models.ClubMembership> _approvedMemberships = [];
+    private readonly List<TennisHub.Core.Models.Court> _courts = [];
+    private readonly List<TennisHub.Core.Models.League> _leagues = [];
+    private readonly CourtFormModel _courtModel = new();
+    private readonly BookingRulesFormModel _bookingRulesModel = new();
+    private readonly Dictionary<Guid, string> _memberNames = [];
+    private bool _isLoading = true;
+    private bool _isAdmin;
+    private bool _isSavingCourt;
+    private bool _isSavingBookingRules;
+    private bool _isSavingMembership;
+    private Guid? _editingCourtId;
+    private Guid? _editingMembershipId;
+    private string _editMembershipType = "member";
+    private bool _editFeePaid;
+    private bool _editCanReserve = true;
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        var currentMembership = await MembershipService.GetMembershipAsync(Id, userId);
+        _isAdmin = currentMembership is not null
+            && currentMembership.Status == TennisHub.Core.Enums.MembershipStatus.Approved
+            && currentMembership.Role == TennisHub.Core.Enums.MembershipRole.Admin;
+
+        if (!_isAdmin)
+        {
+            _pendingMemberships.Clear();
+            _approvedMemberships.Clear();
+            _isLoading = false;
+            return;
+        }
+
+        _pendingMemberships.Clear();
+        _pendingMemberships.AddRange(await MembershipService.GetPendingMembershipsAsync(Id));
+
+        _approvedMemberships.Clear();
+        _approvedMemberships.AddRange(await MembershipService.GetApprovedMembershipsAsync(Id));
+
+        _memberNames.Clear();
+        var allUserIds = _pendingMemberships.Select(m => m.UserId)
+            .Concat(_approvedMemberships.Select(m => m.UserId))
+            .Distinct();
+        var profiles = await ProfileService.GetProfilesAsync(allUserIds);
+        foreach (var (id, profile) in profiles)
+        {
+            _memberNames[id] = !string.IsNullOrWhiteSpace(profile.FullName)
+                ? profile.FullName
+                : id.ToString()[..8];
+        }
+
+        _courts.Clear();
+        _courts.AddRange(await CourtService.GetCourtsAsync(Id));
+
+        var rules = await BookingRuleService.GetRulesAsync(Id);
+        _bookingRulesModel.MinHoursPerBooking = rules?.MinHoursPerBooking ?? 0.5m;
+        _bookingRulesModel.MaxHoursPerBooking = rules?.MaxHoursPerBooking ?? 2;
+        _bookingRulesModel.MaxAdvanceDays = rules?.MaxAdvanceDays ?? 7;
+
+        _leagues.Clear();
+        _leagues.AddRange(await LeagueService.GetLeaguesAsync(Id));
+
+        _isLoading = false;
+    }
+
+    private async Task DecideAsync(TennisHub.Core.Models.ClubMembership membership, string status)
+    {
+        try
+        {
+            var success = await MembershipService.UpdateMembershipStatusAsync(membership, status);
+            if (!success)
+            {
+                _errorMessage = "Promjena statusa nije uspjela.";
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Promjena statusa nije uspjela: {ex.Message}";
+        }
+    }
+
+    private async Task SaveCourtAsync()
+    {
+        _errorMessage = null;
+        _isSavingCourt = true;
+
+        try
+        {
+            var success = _editingCourtId.HasValue
+                ? await CourtService.UpdateCourtAsync(_editingCourtId.Value, _courtModel.Name, _courtModel.SurfaceType, _courtModel.HasFloodlights)
+                : await CourtService.CreateCourtAsync(Id, _courtModel.Name, _courtModel.SurfaceType, _courtModel.HasFloodlights) is not null;
+
+            if (!success)
+            {
+                _errorMessage = _editingCourtId.HasValue
+                    ? "Spremanje izmjena terena nije uspjelo."
+                    : "Dodavanje terena nije uspjelo.";
+                return;
+            }
+
+            ResetCourtForm();
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = _editingCourtId.HasValue
+                ? $"Spremanje izmjena terena nije uspjelo: {ex.Message}"
+                : $"Dodavanje terena nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isSavingCourt = false;
+        }
+    }
+
+    private void EditCourt(TennisHub.Core.Models.Court court)
+    {
+        _editingCourtId = court.Id;
+        _courtModel.Name = court.Name;
+        _courtModel.SurfaceType = court.SurfaceType;
+        _courtModel.HasFloodlights = court.HasFloodlights;
+        _errorMessage = null;
+    }
+
+    private void CancelCourtEdit()
+    {
+        ResetCourtForm();
+        _errorMessage = null;
+    }
+
+    private async Task DeleteCourtAsync(TennisHub.Core.Models.Court court)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            var success = await CourtService.DeleteCourtAsync(court.Id);
+            if (!success)
+            {
+                _errorMessage = "Brisanje terena nije uspjelo.";
+                return;
+            }
+
+            if (_editingCourtId == court.Id)
+            {
+                ResetCourtForm();
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Brisanje terena nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private void ResetCourtForm()
+    {
+        _editingCourtId = null;
+        _courtModel.Name = string.Empty;
+        _courtModel.SurfaceType = null;
+        _courtModel.HasFloodlights = false;
+    }
+
+    private async Task SaveBookingRulesAsync()
+    {
+        _errorMessage = null;
+        _isSavingBookingRules = true;
+
+        try
+        {
+            var success = await BookingRuleService.UpdateRulesAsync(
+                Id,
+                _bookingRulesModel.MinHoursPerBooking,
+                _bookingRulesModel.MaxHoursPerBooking,
+                _bookingRulesModel.MaxAdvanceDays);
+
+            if (!success)
+            {
+                _errorMessage = "Spremanje pravila rezervacije nije uspjelo.";
+                return;
+            }
+
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Spremanje pravila rezervacije nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isSavingBookingRules = false;
+        }
+    }
+
+    private async Task FinishLeagueAsync(TennisHub.Core.Models.League league)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            await LeagueService.UpdateLeagueStatusAsync(league.Id, "finished");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Zatvaranje lige nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private async Task ReactivateLeagueAsync(TennisHub.Core.Models.League league)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            await LeagueService.UpdateLeagueStatusAsync(league.Id, "active");
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Aktiviranje lige nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private async Task DeleteLeagueAsync(TennisHub.Core.Models.League league)
+    {
+        _errorMessage = null;
+
+        try
+        {
+            await LeagueService.DeleteLeagueAsync(league.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Brisanje lige nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private string GetMemberName(Guid userId)
+        => _memberNames.TryGetValue(userId, out var name) ? name : userId.ToString()[..8];
+
+    private void EditMembership(TennisHub.Core.Models.ClubMembership membership)
+    {
+        _editingMembershipId = membership.Id;
+        _editMembershipType = membership.MembershipTypeValue;
+        _editFeePaid = membership.FeePaid;
+        _editCanReserve = membership.CanReserve;
+        _errorMessage = null;
+    }
+
+    private void CancelMembershipEdit()
+    {
+        _editingMembershipId = null;
+        _errorMessage = null;
+    }
+
+    private async Task SaveMembershipDetailsAsync(TennisHub.Core.Models.ClubMembership membership)
+    {
+        _errorMessage = null;
+        _isSavingMembership = true;
+
+        try
+        {
+            var success = await MembershipService.UpdateMembershipDetailsAsync(
+                membership, _editMembershipType, _editFeePaid, _editCanReserve);
+
+            if (!success)
+            {
+                _errorMessage = "Spremanje podataka o članu nije uspjelo.";
+                return;
+            }
+
+            _editingMembershipId = null;
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Spremanje podataka o članu nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isSavingMembership = false;
+        }
+    }
+
+    private sealed class CourtFormModel
+    {
+        [Required(ErrorMessage = "Naziv terena je obavezan.")]
+        public string Name { get; set; } = string.Empty;
+
+        public string? SurfaceType { get; set; }
+
+        public bool HasFloodlights { get; set; }
+    }
+
+    private sealed class BookingRulesFormModel : IValidatableObject
+    {
+        [Range(typeof(decimal), "0.5", "24", ErrorMessage = "Minimalno trajanje mora biti između 0.5 i 24 sata.")]
+        public decimal MinHoursPerBooking { get; set; } = 0.5m;
+
+        [Range(typeof(decimal), "0.5", "24", ErrorMessage = "Maksimalno trajanje mora biti između 0.5 i 24 sata.")]
+        public decimal MaxHoursPerBooking { get; set; } = 2;
+
+        [Range(1, 365, ErrorMessage = "Maksimalni broj dana unaprijed mora biti između 1 i 365.")]
+        public int MaxAdvanceDays { get; set; } = 7;
+
+        public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+        {
+            if (MinHoursPerBooking > MaxHoursPerBooking)
+            {
+                yield return new ValidationResult(
+                    "Minimalno trajanje ne može biti veće od maksimalnog trajanja.",
+                    [nameof(MinHoursPerBooking), nameof(MaxHoursPerBooking)]);
+            }
+        }
+    }
+}

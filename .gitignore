@@ -1,0 +1,23 @@
+## .NET build outputs
+**/bin/
+**/obj/
+
+## User/local files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+## Rider / VS Code / VS
+.vs/
+.idea/
+.vscode/
+
+## Test and coverage
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+## Local secrets/config
+**/appsettings.Development.json

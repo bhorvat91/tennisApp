@@ -1,0 +1,170 @@
+@using TennisHub.Core.Models
+
+<div class="schedule-wrapper">
+    <div class="schedule-table">
+
+        <!-- Header row -->
+        <div class="schedule-header-row">
+            <div class="time-gutter-header">Sat</div>
+            @foreach (var court in Courts)
+            {
+                <div class="court-header-cell">@court.Name</div>
+            }
+        </div>
+
+        <!-- Body -->
+        <div class="schedule-body">
+
+            <!-- Time gutter -->
+            <div class="time-gutter-col">
+                @foreach (var slot in TimeSlots)
+                {
+                    <div class="time-label-cell @(slot.Minute == 0 ? "full-hour" : "half-hour")">
+                        @if (slot.Minute == 0)
+                        {
+                            <span class="time-label-text">@slot.ToString("HH:mm")</span>
+                        }
+                        else
+                        {
+                            <span class="time-label-half">@slot.ToString("HH:mm")</span>
+                        }
+                    </div>
+                }
+            </div>
+
+            <!-- One column per court -->
+            @foreach (var court in Courts)
+            {
+                var courtId = court.Id;
+                var courtName = court.Name;
+                var courtReservations = Reservations.Where(r => r.CourtId == courtId).ToList();
+
+                <div class="court-col" style="height: @(TotalHeightPx)px">
+
+                    @* Slot rows – free ones are clickable *@
+                    @for (var i = 0; i < TimeSlots.Count; i++)
+                    {
+                        var slot = TimeSlots[i];
+                        var slotStart = Date.ToDateTime(new TimeOnly(slot.Hour, slot.Minute), DateTimeKind.Local);
+                        var slotEnd = slotStart.AddMinutes(30);
+                        var isOccupied = courtReservations.Any(r =>
+                            r.StartTime.ToLocalTime() < slotEnd &&
+                            r.EndTime.ToLocalTime() > slotStart);
+                        var canFitMinimumDuration = GetMaxAvailableHours(courtReservations, slotStart) >= MinBookingHours;
+                        var previewEnd = slotStart.AddMinutes((double)Math.Max(MinBookingHours, 0.5m) * 60);
+                        var topPx = i * SlotHeightPx;
+                        var isHour = slot.Minute == 0;
+                        var capturedCourt = court;
+                        var capturedStart = slotStart;
+                        var capturedPreviewEnd = previewEnd;
+
+                        @if (isOccupied || !canFitMinimumDuration)
+                        {
+                            <div class="time-slot @(isHour ? "full-hour" : "half-hour")"
+                                 style="top: @(topPx)px"></div>
+                        }
+                        else
+                        {
+                            <div class="time-slot free-slot @(isHour ? "full-hour" : "half-hour")"
+                                 style="top: @(topPx)px"
+                                 title="Rezerviraj @capturedStart.ToString("HH:mm") – @capturedPreviewEnd.ToString("HH:mm")"
+                                 @onclick="() => RaiseSlotClicked(capturedCourt.Id, capturedCourt.Name, capturedStart, capturedPreviewEnd)">
+                            </div>
+                        }
+                    }
+
+                    @* Reservation blocks overlaid *@
+                    @foreach (var res in courtReservations)
+                    {
+                        var localStart = res.StartTime.ToLocalTime();
+                        var localEnd = res.EndTime.ToLocalTime();
+                        var isOwn = res.UserId == CurrentUserId;
+                        var top = GetTop(localStart);
+                        var height = GetHeight(localStart, localEnd);
+
+                        <div class="reservation-block @(isOwn ? "own-reservation" : "other-reservation")"
+                             style="top: @(top)px; height: @(height)px">
+                            <span class="res-time">@localStart.ToString("HH:mm") – @localEnd.ToString("HH:mm")</span>
+                            @if (isOwn)
+                            {
+                                <span class="res-label">Moja rezervacija</span>
+                            }
+                        </div>
+                    }
+
+                </div>
+            }
+
+        </div>
+    </div>
+</div>
+
+@code {
+    // ── Parameters ────────────────────────────────────────────────────────────
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<TennisHub.Core.Models.Court> Courts { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Reservation> Reservations { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public DateOnly Date { get; set; }
+
+    [Parameter, EditorRequired]
+    public Guid CurrentUserId { get; set; }
+
+    [Parameter]
+    public decimal MinBookingHours { get; set; } = 0.5m;
+
+    [Parameter]
+    public EventCallback<SlotClickedArgs> OnSlotClicked { get; set; }
+
+    // ── Constants ─────────────────────────────────────────────────────────────
+
+    private const int SlotHeightPx = 48;
+    private const int StartHour = 7;
+    private const int EndHour = 22;
+    private static readonly int TotalSlots = (EndHour - StartHour) * 2;
+    private static readonly int TotalHeightPx = TotalSlots * SlotHeightPx;
+
+    private static readonly IReadOnlyList<TimeOnly> TimeSlots =
+        Enumerable.Range(0, TotalSlots)
+                  .Select(i => new TimeOnly(StartHour + i / 2, (i % 2) * 30))
+                  .ToList();
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private static int GetTop(DateTime localTime)
+    {
+        var minutes = localTime.Hour * 60 + localTime.Minute - StartHour * 60;
+        return Math.Max(0, minutes * SlotHeightPx / 30);
+    }
+
+    private static int GetHeight(DateTime localStart, DateTime localEnd)
+    {
+        var startMin = Math.Max(localStart.Hour * 60 + localStart.Minute, StartHour * 60);
+        var endMin   = Math.Min(localEnd.Hour   * 60 + localEnd.Minute,   EndHour   * 60);
+        return Math.Max(SlotHeightPx, (endMin - startMin) * SlotHeightPx / 30);
+    }
+
+    private static decimal GetMaxAvailableHours(IEnumerable<Reservation> courtReservations, DateTime slotStartLocal)
+    {
+        var scheduleEndLocal = slotStartLocal.Date.AddHours(EndHour);
+        var nextReservationStart = courtReservations
+            .Select(x => x.StartTime.ToLocalTime())
+            .Where(x => x > slotStartLocal)
+            .DefaultIfEmpty(scheduleEndLocal)
+            .Min();
+
+        var maxMinutes = Math.Max(0, (nextReservationStart - slotStartLocal).TotalMinutes);
+        return Math.Floor((decimal)(maxMinutes / 30)) / 2m;
+    }
+
+    private Task RaiseSlotClicked(Guid courtId, string courtName, DateTime start, DateTime end)
+        => OnSlotClicked.InvokeAsync(new SlotClickedArgs(courtId, courtName, start, end));
+
+    // ── Nested types ──────────────────────────────────────────────────────────
+
+    public sealed record SlotClickedArgs(Guid CourtId, string CourtName, DateTime Start, DateTime End);
+}

@@ -1,0 +1,160 @@
+@page "/clubs"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IClubService ClubService
+@inject IMembershipService MembershipService
+@inject NavigationManager Navigation
+
+<PageTitle>Klubovi</PageTitle>
+
+<h1>Klubovi</h1>
+
+@if (!string.IsNullOrWhiteSpace(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
+}
+else if (_clubs.Count == 0)
+{
+    <p>Nema dostupnih klubova.</p>
+}
+else
+{
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+        @foreach (var club in _clubs)
+        {
+            var membership = _membershipByClubId.GetValueOrDefault(club.Id);
+            var statusText = GetStatusText(membership);
+            var badgeClass = GetStatusBadgeClass(membership);
+            <div class="col">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title"><a href="@($"/clubs/{club.Id}")" class="text-decoration-none stretched-link">@club.Name</a></h5>
+                        <p class="card-text text-muted small">@(string.IsNullOrWhiteSpace(club.Address) ? "Adresa nije navedena" : club.Address)</p>
+                    </div>
+                    <div class="card-footer d-flex justify-content-between align-items-center position-relative">
+                        <span class="badge @badgeClass">@statusText</span>
+                        @if (membership is null)
+                        {
+                            <button class="btn btn-sm btn-outline-success" style="position: relative; z-index: 2" @onclick="() => JoinClubAsync(club.Id)">Pridruži se</button>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private readonly List<TennisHub.Core.Models.Club> _clubs = [];
+    private readonly Dictionary<Guid, TennisHub.Core.Models.ClubMembership> _membershipByClubId = [];
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadDataAsync();
+    }
+
+    private async Task LoadDataAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        try
+        {
+            await AuthService.InitializeAsync();
+            var user = AuthService.CurrentUser;
+
+            if (user is null || !Guid.TryParse(user.Id, out var userId))
+            {
+                Navigation.NavigateTo("/login", true);
+                return;
+            }
+
+            _clubs.Clear();
+            _clubs.AddRange(await ClubService.GetClubsAsync());
+
+            _membershipByClubId.Clear();
+            var memberships = await ClubService.GetCurrentUserMembershipsAsync(userId);
+            foreach (var membership in memberships)
+            {
+                _membershipByClubId[membership.ClubId] = membership;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Neuspješno učitavanje klubova: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task JoinClubAsync(Guid clubId)
+    {
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        try
+        {
+            var success = await MembershipService.RequestJoinAsync(clubId, userId);
+            if (success)
+            {
+                await LoadDataAsync();
+            }
+            else
+            {
+                _errorMessage = "Slanje zahtjeva nije uspjelo.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Slanje zahtjeva nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private static string GetStatusBadgeClass(TennisHub.Core.Models.ClubMembership? membership)
+    {
+        if (membership is null) return "bg-secondary";
+        return membership.Status switch
+        {
+            TennisHub.Core.Enums.MembershipStatus.Pending => "bg-warning text-dark",
+            TennisHub.Core.Enums.MembershipStatus.Rejected => "bg-danger",
+            TennisHub.Core.Enums.MembershipStatus.Approved => "bg-success",
+            _ => "bg-secondary"
+        };
+    }
+
+    private static string GetStatusText(TennisHub.Core.Models.ClubMembership? membership)
+    {
+        if (membership is null)
+        {
+            return "Nije član";
+        }
+
+        return membership.Status switch
+        {
+            TennisHub.Core.Enums.MembershipStatus.Pending => "Na čekanju",
+            TennisHub.Core.Enums.MembershipStatus.Rejected => "Odbijen",
+            TennisHub.Core.Enums.MembershipStatus.Approved when membership.Role == TennisHub.Core.Enums.MembershipRole.Admin => "Admin",
+            TennisHub.Core.Enums.MembershipStatus.Approved => "Odobren",
+            _ => "Nije član"
+        };
+    }
+}

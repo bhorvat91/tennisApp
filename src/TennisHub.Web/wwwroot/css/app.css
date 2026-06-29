@@ -1,0 +1,442 @@
+:root {
+    --th-primary: #1d7f48;
+    --th-primary-dark: #146338;
+    --th-primary-light: #32a362;
+    --th-accent: #d8ff5d;
+    --th-ink: #1b2a22;
+    --th-surface: #f7faf8;
+    --th-surface-card: #ffffff;
+    --bs-primary: #1d7f48;
+    --bs-primary-rgb: 29, 127, 72;
+}
+
+html, body {
+    font-family: 'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: var(--th-ink);
+    background: radial-gradient(circle at 10% 10%, rgba(216, 255, 93, 0.15), transparent 38%),
+                radial-gradient(circle at 90% 0%, rgba(29, 127, 72, 0.14), transparent 32%),
+                linear-gradient(180deg, #f9fcfa 0%, #f3f8f5 100%);
+}
+
+h1:focus {
+    outline: none;
+}
+
+h1, h2, h3, h4, h5 {
+    color: #143325;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+a, .btn-link {
+    color: var(--th-primary);
+}
+
+a:hover, .btn-link:hover {
+    color: var(--th-primary-dark);
+}
+
+.th-app-shell {
+    min-height: calc(100vh - 70px);
+    padding-bottom: 1.25rem;
+}
+
+.th-main-content {
+    position: relative;
+}
+
+.th-main-content::before {
+    content: "";
+    position: absolute;
+    inset: -1rem -0.6rem auto;
+    height: 110px;
+    z-index: -1;
+    border-radius: 18px;
+    background: linear-gradient(120deg, rgba(20, 99, 56, 0.12), rgba(216, 255, 93, 0.2));
+    filter: blur(0.3px);
+}
+
+.th-navbar {
+    background: linear-gradient(120deg, #0f4d2d, #1d7f48 70%, #239556);
+    box-shadow: 0 10px 28px rgba(17, 60, 37, 0.24);
+}
+
+.th-brand {
+    color: #fff !important;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    letter-spacing: 0.01em;
+}
+
+.th-brand-ball {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #f2ffb8 0%, #ddff67 65%, #c7eb4d 100%);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2), inset -2px -2px 0 rgba(0, 0, 0, 0.08);
+}
+
+.th-nav-links .nav-link {
+    color: rgba(255, 255, 255, 0.9) !important;
+    border-radius: 999px;
+    padding: 0.4rem 0.85rem !important;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.th-nav-links .nav-link:hover,
+.th-nav-links .nav-link:focus {
+    color: #fff !important;
+    background-color: rgba(255, 255, 255, 0.16);
+}
+
+.btn-primary {
+    color: #fff;
+    background: linear-gradient(135deg, var(--th-primary) 0%, var(--th-primary-dark) 100%);
+    border-color: var(--th-primary-dark);
+    box-shadow: 0 6px 16px rgba(20, 99, 56, 0.22);
+}
+
+    .btn-primary:hover, .btn-primary:focus, .btn-primary:active {
+        background-color: var(--th-primary-dark);
+        border-color: var(--th-primary-dark);
+    }
+
+.btn-outline-success,
+.btn-outline-primary,
+.btn-outline-info {
+    border-width: 1.5px;
+    border-radius: 999px;
+}
+
+.btn-outline-success:hover,
+.btn-outline-primary:hover,
+.btn-outline-info:hover {
+    transform: translateY(-1px);
+}
+
+.btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
+  box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem var(--th-primary-light);
+}
+
+/* Tennis-themed card wrapper. Mirrors Bootstrap's .card styling. */
+.th-card {
+    padding: 1.25rem;
+    border-radius: 0.9rem;
+    box-shadow: 0 12px 28px rgba(19, 59, 36, 0.08);
+    background-color: var(--th-surface-card);
+    border: 1px solid rgba(28, 98, 58, 0.14);
+}
+
+/* Use Bootstrap's .badge classes directly in components for status badges. */
+
+.content {
+    padding-top: 1.1rem;
+}
+
+.card {
+    border-radius: 0.95rem;
+    border: 1px solid rgba(28, 98, 58, 0.12);
+    box-shadow: 0 10px 30px rgba(24, 69, 44, 0.08);
+    background-color: var(--th-surface-card);
+}
+
+.card .card-title {
+    color: #153627;
+    font-weight: 700;
+}
+
+.card-footer {
+    background-color: rgba(248, 253, 250, 0.88);
+    border-top: 1px solid rgba(28, 98, 58, 0.1);
+}
+
+.form-control {
+    border-radius: 0.7rem;
+    border: 1px solid rgba(28, 98, 58, 0.22);
+}
+
+.form-control:focus {
+    border-color: rgba(29, 127, 72, 0.6);
+}
+
+.table {
+    --bs-table-bg: transparent;
+    border-radius: 0.9rem;
+    overflow: hidden;
+}
+
+.table > :not(caption) > * > * {
+    padding: 0.8rem 0.75rem;
+}
+
+.table-hover > tbody > tr:hover > * {
+    background-color: rgba(216, 255, 93, 0.15);
+}
+
+.badge {
+    border-radius: 999px;
+    font-weight: 600;
+    padding: 0.4em 0.72em;
+}
+
+.valid.modified:not([type=checkbox]) {
+    outline: 1px solid #26b050;
+}
+
+.invalid {
+    outline: 1px solid red;
+}
+
+.validation-message {
+    color: red;
+}
+
+#blazor-error-ui {
+    color-scheme: light only;
+    background: lightyellow;
+    bottom: 0;
+    box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.2);
+    box-sizing: border-box;
+    display: none;
+    left: 0;
+    padding: 0.6rem 1.25rem 0.7rem 1.25rem;
+    position: fixed;
+    width: 100%;
+    z-index: 1000;
+}
+
+    #blazor-error-ui .dismiss {
+        cursor: pointer;
+        position: absolute;
+        right: 0.75rem;
+        top: 0.5rem;
+    }
+
+.blazor-error-boundary {
+    background: url(data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTYiIGhlaWdodD0iNDkiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIG92ZXJmbG93PSJoaWRkZW4iPjxkZWZzPjxjbGlwUGF0aCBpZD0iY2xpcDAiPjxyZWN0IHg9IjIzNSIgeT0iNTEiIHdpZHRoPSI1NiIgaGVpZ2h0PSI0OSIvPjwvY2xpcFBhdGg+PC9kZWZzPjxnIGNsaXAtcGF0aD0idXJsKCNjbGlwMCkiIHRyYW5zZm9ybT0idHJhbnNsYXRlKC0yMzUgLTUxKSI+PHBhdGggZD0iTTI2My41MDYgNTFDMjY0LjcxNyA1MSAyNjUuODEzIDUxLjQ4MzcgMjY2LjYwNiA1Mi4yNjU4TDI2Ny4wNTIgNTIuNzk4NyAyNjcuNTM5IDUzLjYyODMgMjkwLjE4NSA5Mi4xODMxIDI5MC41NDUgOTIuNzk1IDI5MC42NTYgOTIuOTk2QzI5MC44NzcgOTMuNTEzIDI5MSA5NC4wODE1IDI5MSA5NC42NzgyIDI5MSA5Ny4wNjUxIDI4OS4wMzggOTkgMjg2LjYxNyA5OUwyNDAuMzgzIDk5QzIzNy45NjMgOTkgMjM2IDk3LjA2NTEgMjM2IDk0LjY3ODIgMjM2IDk0LjM3OTkgMjM2LjAzMSA5NC4wODg2IDIzNi4wODkgOTMuODA3MkwyMzYuMzM4IDkzLjAxNjIgMjM2Ljg1OCA5Mi4xMzE0IDI1OS40NzMgNTMuNjI5NCAyNTkuOTYxIDUyLjc5ODUgMjYwLjQwNyA1Mi4yNjU4QzI2MS4yIDUxLjQ4MzcgMjYyLjI5NiA1MSAyNjMuNTA2IDUxWk0yNjMuNTg2IDY2LjAxODNDMjYwLjczNyA2Ni4wMTgzIDI1OS4zMTMgNjcuMTI0NSAyNTkuMzEzIDY5LjMzNyAyNTkuMzEzIDY5LjYxMDIgMjU5LjMzMiA2OS44NjA4IDI1OS4zNzEgNzAuMDg4N0wyNjEuNzk1IDg0LjAxNjEgMjY1LjM4IDg0LjAxNjEgMjY3LjgyMSA2OS43NDc1QzI2Ny44NiA2OS43MzA5IDI2Ny44NzkgNjkuNTg3NyAyNjcuODc5IDY5LjMxNzkgMjY3Ljg3OSA2Ny4xMTgyIDI2Ni40NDggNjYuMDE4MyAyNjMuNTg2IDY2LjAxODNaTTI2My41NzYgODYuMDU0N0MyNjEuMDQ5IDg2LjA1NDcgMjU5Ljc4NiA4Ny4zMDA1IDI1OS43ODYgODkuNzkyMSAyNTkuNzg2IDkyLjI4MzcgMjYxLjA0OSA5My41Mjk1IDI2My41NzYgOTMuNTI5NSAyNjYuMTE2IDkzLjUyOTUgMjY3LjM4NyA5Mi4yODM3IDI2Ny4zODcgODkuNzkyMSAyNjcuMzg3IDg3LjMwMDUgMjY2LjExNiA4Ni4wNTQ3IDI2My41NzYgODYuMDU0N1oiIGZpbGw9IiNGRkU1MDAiIGZpbGwtcnVsZT0iZXZlbm9kZCIvPjwvZz48L3N2Zz4=) no-repeat 1rem/1.8rem, #b32121;
+    padding: 1rem 1rem 1rem 3.7rem;
+    color: white;
+}
+
+    .blazor-error-boundary::after {
+        content: "An error has occurred."
+    }
+
+.loading-progress {
+    position: relative;
+    display: block;
+    width: 8rem;
+    height: 8rem;
+    margin: 20vh auto 1rem auto;
+}
+
+    .loading-progress circle {
+        fill: none;
+        stroke: #e0e0e0;
+        stroke-width: 0.6rem;
+        transform-origin: 50% 50%;
+        transform: rotate(-90deg);
+    }
+
+        .loading-progress circle:last-child {
+            stroke: #1b6ec2;
+            stroke-dasharray: calc(3.141 * var(--blazor-load-percentage, 0%) * 0.8), 500%;
+            transition: stroke-dasharray 0.05s ease-in-out;
+        }
+
+.loading-progress-text {
+    position: absolute;
+    text-align: center;
+    font-weight: bold;
+    inset: calc(20vh + 3.25rem) 0 auto 0.2rem;
+}
+
+    .loading-progress-text:after {
+        content: var(--blazor-load-percentage-text, "Loading");
+    }
+
+
+/* ---- Court Schedule / Timeline ------------------------------------------ */
+
+.schedule-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border: 1px solid #dee2e6;
+    border-radius: 0.5rem;
+}
+
+.schedule-table {
+    min-width: 400px;
+}
+
+/* Sticky header row */
+.schedule-header-row {
+    display: flex;
+    border-bottom: 2px solid #dee2e6;
+    background: #f8f9fa;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+.time-gutter-header {
+    width: 64px;
+    flex-shrink: 0;
+    padding: 0.5rem 0.4rem;
+    font-weight: 600;
+    font-size: 0.85rem;
+    color: #6c757d;
+    border-right: 1px solid #dee2e6;
+}
+
+.court-header-cell {
+    flex: 1;
+    min-width: 160px;
+    padding: 0.5rem;
+    text-align: center;
+    font-weight: 600;
+    border-left: 1px solid #dee2e6;
+}
+
+/* Body row: time gutter + court columns side by side */
+.schedule-body {
+    display: flex;
+    flex-direction: row;
+}
+
+.time-gutter-col {
+    width: 64px;
+    flex-shrink: 0;
+    border-right: 1px solid #dee2e6;
+}
+
+.time-label-cell {
+    height: 48px;
+    display: flex;
+    align-items: flex-start;
+    padding: 3px 6px 0;
+    box-sizing: border-box;
+}
+
+.time-label-cell.full-hour {
+    border-top: 1px solid #dee2e6;
+}
+
+.time-label-cell.half-hour {
+    border-top: 1px dashed #ececec;
+}
+
+.time-label-text {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #333;
+}
+
+.time-label-half {
+    font-size: 0.75rem;
+    color: #bbb;
+}
+
+/* Court columns */
+.court-col {
+    flex: 1;
+    min-width: 160px;
+    position: relative;
+    border-left: 1px solid #dee2e6;
+}
+
+/* Individual time-slot rows (background grid + click targets) */
+.time-slot {
+    position: absolute;
+    width: 100%;
+    height: 48px;
+    box-sizing: border-box;
+    z-index: 1;
+}
+
+.time-slot.full-hour {
+    border-top: 1px solid #dee2e6;
+}
+
+.time-slot.half-hour {
+    border-top: 1px dashed #ececec;
+}
+
+.time-slot.free-slot {
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+
+.time-slot.free-slot:hover {
+    background-color: rgba(74, 124, 89, 0.09);
+}
+
+/* Reservation blocks overlaid on court columns */
+.reservation-block {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    border-radius: 5px;
+    padding: 4px 8px;
+    overflow: hidden;
+    font-size: 0.78rem;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.reservation-block.own-reservation {
+    background-color: var(--th-primary);
+    color: #fff;
+    border: 1px solid var(--th-primary-dark);
+}
+
+.reservation-block.other-reservation {
+    background-color: #5b9bd5;
+    color: #fff;
+    border: 1px solid #4a8ac4;
+}
+
+.res-time {
+    display: block;
+    font-weight: 600;
+}
+
+.res-label {
+    display: block;
+    font-size: 0.72rem;
+    opacity: 0.9;
+}
+
+code {
+    color: #c02d76;
+}
+.schedule-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1050;
+}
+
+.schedule-modal {
+    background: #fff;
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    max-width: 420px;
+    width: 90%;
+    box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.2);
+}
+
+
+.form-floating > .form-control-plaintext::placeholder, .form-floating > .form-control::placeholder {
+    color: var(--bs-secondary-color);
+    text-align: end;
+}
+
+.form-floating > .form-control-plaintext:focus::placeholder, .form-floating > .form-control:focus::placeholder {
+    text-align: start;
+}

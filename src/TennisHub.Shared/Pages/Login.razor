@@ -1,0 +1,88 @@
+@page "/login"
+@inject IAuthService AuthService
+@inject SupabaseAuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Prijava</PageTitle>
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h4 class="card-title mb-4">Prijava</h4>
+
+                <EditForm Model="_model" OnValidSubmit="SignInAsync">
+                    <DataAnnotationsValidator />
+                    <ValidationSummary />
+
+                    <div class="mb-3">
+                        <label class="form-label" for="email">Email</label>
+                        <InputText id="email" class="form-control" @bind-Value="_model.Email" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="password">Lozinka</label>
+                        <InputText id="password" type="password" class="form-control" @bind-Value="_model.Password" />
+                    </div>
+
+                    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+                    {
+                        <div class="alert alert-danger">@_errorMessage</div>
+                    }
+
+                    <button class="btn btn-primary" type="submit" disabled="@_isLoading">Prijava</button>
+                </EditForm>
+
+                <p class="mt-3">Nemate račun? <a href="/register">Registrirajte se</a>.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly LoginModel _model = new();
+    private string? _errorMessage;
+    private bool _isLoading;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+
+        if (AuthService.CurrentUser is not null)
+        {
+            Navigation.NavigateTo("/clubs", true);
+        }
+    }
+
+    private async Task SignInAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+
+        var result = await AuthService.SignInAsync(_model.Email, _model.Password);
+
+        if (result.Success)
+        {
+            AuthStateProvider.NotifyAuthenticationStateChangedAsync();
+            Navigation.NavigateTo("/clubs", true);
+        }
+        else
+        {
+            _errorMessage = string.IsNullOrWhiteSpace(result.ErrorMessage)
+                ? "Prijava nije uspjela. Provjerite unesene podatke."
+                : result.ErrorMessage;
+        }
+
+        _isLoading = false;
+    }
+
+    private sealed class LoginModel
+    {
+        [Required(ErrorMessage = "Email je obavezan.")]
+        [EmailAddress(ErrorMessage = "Unesite ispravnu email adresu.")]
+        public string Email { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Lozinka je obavezna.")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

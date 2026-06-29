@@ -1,0 +1,197 @@
+@page "/profile"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IProfileService ProfileService
+@inject IClubService ClubService
+@inject NavigationManager Navigation
+
+<PageTitle>Moj profil</PageTitle>
+
+<div class="row justify-content-center mt-4">
+    <div class="col-md-7 col-lg-6">
+        <h1 class="mb-4">Moj profil</h1>
+
+        @if (_isLoading)
+        {
+            <div class="d-flex justify-content-center py-5">
+                <div class="spinner-border text-success" role="status">
+                    <span class="visually-hidden">Učitavanje...</span>
+                </div>
+            </div>
+        }
+        else
+        {
+            @if (!string.IsNullOrWhiteSpace(_errorMessage))
+            {
+                <div class="alert alert-danger">@_errorMessage</div>
+            }
+            @if (!string.IsNullOrWhiteSpace(_successMessage))
+            {
+                <div class="alert alert-success">@_successMessage</div>
+            }
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <EditForm Model="_model" OnValidSubmit="SaveAsync">
+                        <DataAnnotationsValidator />
+                        <ValidationSummary />
+
+                        <div class="mb-3">
+                            <label class="form-label" for="fullName">Ime i prezime</label>
+                            <InputText id="fullName" class="form-control" @bind-Value="_model.FullName" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="phone">Telefon</label>
+                            <InputText id="phone" class="form-control" @bind-Value="_model.Phone" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="racket">Reket</label>
+                            <InputText id="racket" class="form-control" placeholder="npr. Wilson Pro Staff 97" @bind-Value="_model.Racket" />
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="avatarUrl">URL slike profila</label>
+                            <InputText id="avatarUrl" class="form-control" placeholder="https://..." @bind-Value="_model.AvatarUrl" />
+                            @if (!string.IsNullOrWhiteSpace(_model.AvatarUrl))
+                            {
+                                <div class="mt-2">
+                                    <img src="@_model.AvatarUrl" alt="Avatar" class="rounded-circle"
+                                         style="width:64px;height:64px;object-fit:cover;"
+                                         onerror="this.style.display='none'" />
+                                </div>
+                            }
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label" for="defaultClub">Zadani klub</label>
+                            <select id="defaultClub" class="form-select" @bind="_model.DefaultClubId">
+                                <option value="">— bez zadanog kluba —</option>
+                                @foreach (var club in _myClubs)
+                                {
+                                    <option value="@club.Id">@club.Name</option>
+                                }
+                            </select>
+                            <div class="form-text">Ovaj klub bit će automatski prikazan pri prijavi.</div>
+                        </div>
+
+                        <button class="btn btn-primary" type="submit" disabled="@_isSaving">
+                            @if (_isSaving)
+                            {
+                                <span class="spinner-border spinner-border-sm me-1" role="status"></span>
+                            }
+                            Spremi promjene
+                        </button>
+                    </EditForm>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    private readonly ProfileFormModel _model = new();
+    private readonly List<TennisHub.Core.Models.Club> _myClubs = [];
+    private bool _isLoading = true;
+    private bool _isSaving;
+    private string? _errorMessage;
+    private string? _successMessage;
+    private Guid _userId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+        if (user is null || !Guid.TryParse(user.Id, out _userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        try
+        {
+            var profileTask = ProfileService.GetProfileAsync(_userId);
+            var allMembershipsTask = ClubService.GetCurrentUserMembershipsAsync(_userId);
+            var allClubsTask = ClubService.GetClubsAsync();
+
+            await Task.WhenAll(profileTask, allMembershipsTask, allClubsTask);
+
+            var profile = await profileTask;
+            var memberships = await allMembershipsTask;
+            var allClubs = await allClubsTask;
+
+            var approvedClubIds = memberships
+                .Where(m => m.Status == TennisHub.Core.Enums.MembershipStatus.Approved)
+                .Select(m => m.ClubId)
+                .ToHashSet();
+
+            _myClubs.AddRange(allClubs.Where(c => approvedClubIds.Contains(c.Id)));
+
+            if (profile is not null)
+            {
+                _model.FullName = profile.FullName ?? string.Empty;
+                _model.Phone = profile.Phone ?? string.Empty;
+                _model.Racket = profile.Racket ?? string.Empty;
+                _model.AvatarUrl = profile.AvatarUrl ?? string.Empty;
+                _model.DefaultClubId = profile.DefaultClubId.HasValue
+                    ? profile.DefaultClubId.Value.ToString()
+                    : string.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Neuspješno učitavanje profila: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _errorMessage = null;
+        _successMessage = null;
+        _isSaving = true;
+
+        try
+        {
+            Guid? defaultClubId = Guid.TryParse(_model.DefaultClubId, out var cid) ? cid : null;
+
+            var success = await ProfileService.UpdateProfileAsync(
+                _userId,
+                string.IsNullOrWhiteSpace(_model.FullName) ? null : _model.FullName,
+                string.IsNullOrWhiteSpace(_model.Phone) ? null : _model.Phone,
+                defaultClubId,
+                string.IsNullOrWhiteSpace(_model.AvatarUrl) ? null : _model.AvatarUrl,
+                string.IsNullOrWhiteSpace(_model.Racket) ? null : _model.Racket);
+
+            if (success)
+            {
+                _successMessage = "Profil je uspješno ažuriran.";
+            }
+            else
+            {
+                _errorMessage = "Ažuriranje profila nije uspjelo.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Ažuriranje profila nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isSaving = false;
+        }
+    }
+
+    private sealed class ProfileFormModel
+    {
+        public string FullName { get; set; } = string.Empty;
+        public string Phone { get; set; } = string.Empty;
+        public string Racket { get; set; } = string.Empty;
+        public string AvatarUrl { get; set; } = string.Empty;
+        public string DefaultClubId { get; set; } = string.Empty;
+    }
+}

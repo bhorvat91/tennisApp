@@ -1,0 +1,368 @@
+@page "/clubs/{ClubId:guid}/courts/{CourtId:guid}/reserve"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject ICourtService CourtService
+@inject IMembershipService MembershipService
+@inject IReservationService ReservationService
+@inject IBookingRuleService BookingRuleService
+@inject IProfileService ProfileService
+@inject NavigationManager Navigation
+
+<PageTitle>Rezervacija terena</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
+}
+else if (_court is null)
+{
+    <div class="alert alert-warning">Teren nije pronađen.</div>
+}
+else if (!_hasAccess)
+{
+    <div class="alert alert-warning">Rezervacija terena dostupna je samo odobrenim članovima kluba koji imaju pravo rezervacije.</div>
+}
+else
+{
+    <h1>Rezervacija – @_court.Name</h1>
+
+    <p><strong>Podloga:</strong> @(string.IsNullOrWhiteSpace(_court.SurfaceType) ? "-" : _court.SurfaceType)</p>
+
+    @if (_bookingRules is not null)
+    {
+        <p>
+            <strong>Pravila kluba:</strong>
+            min. @_bookingRules.MinHoursPerBooking h po rezervaciji,
+            maks. @_bookingRules.MaxHoursPerBooking h po rezervaciji,
+            maks. @_bookingRules.MaxAdvanceDays dana unaprijed.
+        </p>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+
+    @if (!string.IsNullOrWhiteSpace(_successMessage))
+    {
+        <div class="alert alert-success">@_successMessage</div>
+    }
+
+    <h2>Nova rezervacija</h2>
+
+    <EditForm Model="_newModel" OnValidSubmit="CreateReservationAsync">
+        <DataAnnotationsValidator />
+        <ValidationSummary />
+
+        <div class="row g-3 align-items-end mb-3">
+            <div class="col-md-3">
+                <label class="form-label" for="res-date">Datum</label>
+                <InputDate id="res-date" class="form-control" @bind-Value="_newModel.Date" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="res-start">Početak (HH:mm)</label>
+                <InputText id="res-start" class="form-control" @bind-Value="_newModel.StartTimeText" placeholder="08:00" />
+            </div>
+            <div class="col-md-2">
+                <label class="form-label" for="res-end">Kraj (HH:mm)</label>
+                <InputText id="res-end" class="form-control" @bind-Value="_newModel.EndTimeText" placeholder="09:00" />
+            </div>
+            <div class="col-md-2">
+                <button class="btn btn-primary" type="submit" disabled="@_isCreating">Rezerviraj</button>
+            </div>
+        </div>
+    </EditForm>
+
+    <h2>Zauzetost – @_selectedDate.ToString("dd.MM.yyyy.")</h2>
+
+    <div class="mb-3">
+        <label class="form-label" for="view-date">Odaberi datum</label>
+        <input type="date" id="view-date" class="form-control" style="max-width:200px"
+               value="@_selectedDate.ToString("yyyy-MM-dd")"
+               @onchange="OnViewDateChangedAsync" />
+    </div>
+
+    @if (_isLoadingReservations)
+    {
+        <p>Učitavanje rezervacija...</p>
+    }
+    else if (_reservations.Count == 0)
+    {
+        <p>Nema rezervacija za odabrani dan.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover table-striped">
+                <thead>
+                    <tr>
+                        <th>Početak</th>
+                        <th>Kraj</th>
+                        <th>Igrač</th>
+                        <th>Status</th>
+                        <th>Akcija</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var res in _reservations)
+                    {
+                        <tr>
+                            <td>@res.StartTime.ToLocalTime().ToString("HH:mm")</td>
+                            <td>@res.EndTime.ToLocalTime().ToString("HH:mm")</td>
+                            <td>
+                                @if (res.UserId == _currentUserId)
+                                {
+                                    <strong>@GetReservationUserName(res.UserId) (ja)</strong>
+                                }
+                                else
+                                {
+                                    @GetReservationUserName(res.UserId)
+                                }
+                            </td>
+                            <td>@(res.UserId == _currentUserId ? "Moja rezervacija" : "Rezervirano")</td>
+                            <td>
+                                @if (res.UserId == _currentUserId)
+                                {
+                                    <button class="btn btn-sm btn-outline-danger"
+                                            @onclick="() => CancelReservationAsync(res)">Otkaži</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    <div class="mt-3">
+        <a href="@($"/clubs/{ClubId}")" class="btn btn-outline-secondary">Natrag na klub</a>
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid ClubId { get; set; }
+
+    [Parameter]
+    public Guid CourtId { get; set; }
+
+    private TennisHub.Core.Models.Court? _court;
+    private TennisHub.Core.Models.ClubBookingRule? _bookingRules;
+    private readonly List<TennisHub.Core.Models.Reservation> _reservations = [];
+    private readonly Dictionary<Guid, string> _reservationUserNames = [];
+    private readonly NewReservationModel _newModel = new();
+    private bool _isLoading = true;
+    private bool _isLoadingReservations;
+    private bool _isCreating;
+    private bool _hasAccess;
+    private Guid _currentUserId;
+    private DateOnly _selectedDate = DateOnly.FromDateTime(DateTime.Today);
+    private string? _errorMessage;
+    private string? _successMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _successMessage = null;
+        _court = null;
+        _hasAccess = false;
+
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        _currentUserId = userId;
+
+        var membership = await MembershipService.GetMembershipAsync(ClubId, userId);
+        _hasAccess = membership?.Status == TennisHub.Core.Enums.MembershipStatus.Approved
+            && (membership.Role == TennisHub.Core.Enums.MembershipRole.Admin || membership.CanReserve);
+
+        if (_hasAccess)
+        {
+            _court = await CourtService.GetCourtsAsync(ClubId)
+                .ContinueWith(t => t.Result.FirstOrDefault(c => c.Id == CourtId));
+
+            _bookingRules = await BookingRuleService.GetRulesAsync(ClubId);
+            _newModel.Date = DateTime.Today;
+
+            await LoadReservationsAsync(_selectedDate);
+        }
+
+        _isLoading = false;
+    }
+
+    private async Task LoadReservationsAsync(DateOnly date)
+    {
+        _isLoadingReservations = true;
+        _reservations.Clear();
+
+        try
+        {
+            _reservations.AddRange(await ReservationService.GetReservationsForCourtAsync(CourtId, date));
+
+            var userIds = _reservations.Select(r => r.UserId).Append(_currentUserId).Distinct();
+            var profiles = await ProfileService.GetProfilesAsync(userIds);
+            _reservationUserNames.Clear();
+            foreach (var (userId, profile) in profiles)
+            {
+                _reservationUserNames[userId] = !string.IsNullOrWhiteSpace(profile.FullName)
+                    ? profile.FullName
+                    : userId.ToString()[..8];
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Neuspješno učitavanje rezervacija: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingReservations = false;
+        }
+    }
+
+    private string GetReservationUserName(Guid userId)
+        => _reservationUserNames.TryGetValue(userId, out var name) ? name : userId.ToString()[..8];
+
+    private async Task OnViewDateChangedAsync(ChangeEventArgs e)
+    {
+        if (DateTime.TryParse(e.Value?.ToString(), out var parsed))
+        {
+            _selectedDate = DateOnly.FromDateTime(parsed);
+            _errorMessage = null;
+            await LoadReservationsAsync(_selectedDate);
+        }
+    }
+
+    private async Task CreateReservationAsync()
+    {
+        _errorMessage = null;
+        _successMessage = null;
+        _isCreating = true;
+
+        try
+        {
+            if (!TryParseTime(_newModel.StartTimeText, out var startHour, out var startMinute))
+            {
+                _errorMessage = "Neispravno formato za početak rezervacije (koristite HH:mm).";
+                return;
+            }
+
+            if (!TryParseTime(_newModel.EndTimeText, out var endHour, out var endMinute))
+            {
+                _errorMessage = "Neispravno formato za kraj rezervacije (koristite HH:mm).";
+                return;
+            }
+
+            var startUtc = new DateTime(_newModel.Date.Year, _newModel.Date.Month, _newModel.Date.Day,
+                startHour, startMinute, 0, DateTimeKind.Local).ToUniversalTime();
+            var endUtc = new DateTime(_newModel.Date.Year, _newModel.Date.Month, _newModel.Date.Day,
+                endHour, endMinute, 0, DateTimeKind.Local).ToUniversalTime();
+
+            if (endUtc <= startUtc)
+            {
+                _errorMessage = "Kraj rezervacije mora biti nakon početka.";
+                return;
+            }
+
+            var durationHours = (decimal)(endUtc - startUtc).TotalHours;
+            var minHours = _bookingRules?.MinHoursPerBooking ?? 0.5m;
+            var maxHours = _bookingRules?.MaxHoursPerBooking ?? 24m;
+            if (durationHours < minHours)
+            {
+                _errorMessage = $"Minimalno trajanje rezervacije je {minHours:0.##} h.";
+                return;
+            }
+
+            if (durationHours > maxHours)
+            {
+                _errorMessage = $"Maksimalno trajanje rezervacije je {maxHours:0.##} h.";
+                return;
+            }
+
+            var result = await ReservationService.CreateReservationAsync(CourtId, ClubId, _currentUserId, startUtc, endUtc);
+            if (result is null)
+            {
+                _errorMessage = "Kreiranje rezervacije nije uspjelo.";
+                return;
+            }
+
+            _successMessage = "Rezervacija je uspješno kreirana.";
+            _selectedDate = DateOnly.FromDateTime(_newModel.Date);
+            await LoadReservationsAsync(_selectedDate);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Kreiranje rezervacije nije uspjelo: {ex.Message}";
+        }
+        finally
+        {
+            _isCreating = false;
+        }
+    }
+
+    private async Task CancelReservationAsync(TennisHub.Core.Models.Reservation reservation)
+    {
+        _errorMessage = null;
+        _successMessage = null;
+
+        try
+        {
+            var success = await ReservationService.CancelReservationAsync(reservation.Id);
+            if (!success)
+            {
+                _errorMessage = "Otkazivanje rezervacije nije uspjelo.";
+                return;
+            }
+
+            _successMessage = "Rezervacija je otkazana.";
+            await LoadReservationsAsync(_selectedDate);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Otkazivanje rezervacije nije uspjelo: {ex.Message}";
+        }
+    }
+
+    private static bool TryParseTime(string? text, out int hour, out int minute)
+    {
+        hour = 0;
+        minute = 0;
+
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return false;
+        }
+
+        var parts = text.Trim().Split(':');
+        if (parts.Length != 2)
+        {
+            return false;
+        }
+
+        return int.TryParse(parts[0], out hour)
+            && int.TryParse(parts[1], out minute)
+            && hour is >= 0 and <= 23
+            && minute is >= 0 and <= 59;
+    }
+
+    private sealed class NewReservationModel
+    {
+        [Required(ErrorMessage = "Datum je obavezan.")]
+        public DateTime Date { get; set; } = DateTime.Today;
+
+        [Required(ErrorMessage = "Početak rezervacije je obavezan.")]
+        public string StartTimeText { get; set; } = "08:00";
+
+        [Required(ErrorMessage = "Kraj rezervacije je obavezan.")]
+        public string EndTimeText { get; set; } = "09:00";
+    }
+}

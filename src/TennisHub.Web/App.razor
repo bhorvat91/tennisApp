@@ -1,0 +1,18 @@
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(TennisHub.Shared.Pages.Home).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(TennisHub.Shared.Layout.MainLayout)">
+                <NotAuthorized>
+                    <RedirectToLogin />
+                </NotAuthorized>
+            </AuthorizeRouteView>
+            <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+        </Found>
+        <NotFound>
+            <PageTitle>Stranica nije pronađena</PageTitle>
+            <LayoutView Layout="@typeof(TennisHub.Shared.Layout.MainLayout)">
+                <p role="alert">Tražena stranica ne postoji.</p>
+            </LayoutView>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>

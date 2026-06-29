@@ -1,61 +1,3 @@
-# TennisHub – MVP Implementation Spec
-
-## 1. Pregled projekta
-
-Multi-tenant aplikacija za upravljanje tenis klubovima – web i mobilna platforma koje dijele kod. MVP pokriva:
-
-- podršku za više klubova na jednoj platformi
-- više razina rola (po klubu, ne globalno)
-- evidenciju članova s odobravanjem pristupa od strane admina
-- rezervacije terena s pravilima koja postavlja admin kluba
-
-Liga modul (raspored natjecanja, unos rezultata, ljestvica) je **izvan opsega ovog MVP-a** i dodaje se naknadno, u zasebnoj fazi.
-
-## 2. Tech stack
-
-- **Baza / backend:** Supabase (PostgreSQL, Auth, Row Level Security, Realtime, Storage)
-- **Web klijent:** Blazor WebAssembly (.NET 8/9)
-- **Mobile klijent:** .NET MAUI Blazor Hybrid – dijeli Razor komponente s web klijentom, gradi se kao pravi APK/IPA bez zasebnog native koda
-- **Komunikacija s bazom:** [supabase-csharp](https://github.com/supabase-community/supabase-csharp) klijent direktno iz Blazor/MAUI aplikacije. Nema zasebnog .NET API sloja za MVP – sigurnost i izolacija podataka po klubu rješava se isključivo preko RLS politika u Postgresu.
-- **Autentikacija:** Supabase Auth (email/password za početak)
-
-> Ako se kasnije pokaže potreba za poslovnom logikom koja ne pripada u bazu (slanje emaila, vanjske integracije), dodaje se tanki ASP.NET Core Web API sloj. Za MVP nije potreban.
-
-## 3. Solution struktura
-
-```
-TennisHub.sln
-├── src/
-│   ├── TennisHub.Shared/        # Razor komponente, modeli, servisi – dijele Web i Mobile
-│   ├── TennisHub.Web/           # Blazor WebAssembly host
-│   ├── TennisHub.Mobile/        # .NET MAUI Blazor Hybrid host
-│   └── TennisHub.Core/          # DTO-i, enumi, validacijska logika neovisna o UI-u
-└── database/
-    └── schema.sql               # Supabase shema (sekcija 6 ovog dokumenta)
-```
-
-## 4. Role i dozvole
-
-| Rola | Opis |
-|---|---|
-| Super Admin | Rezervirano za buduću upotrebu (upravljanje platformom) – nije implementirano u MVP-u |
-| Club Admin | Upravlja članovima, terenima i pravilima rezervacije unutar svog kluba. Može ih biti više po klubu. |
-| Member | Korisnik odobren u klubu, rezervira terene po pravilima kluba. |
-
-**Bitno:** rola je vezana uz **članstvo u klubu** (`club_memberships`), ne uz korisnika globalno. Isti korisnik može biti Member u jednom klubu, a Admin u drugom – korisnik može biti član više klubova istovremeno.
-
-## 5. Domenski model
-
-- **Profile** – proširenje Supabase Auth korisnika (ime, telefon)
-- **Club** – klub (naziv, adresa)
-- **ClubMembership** – spaja korisnika i klub: `role` (admin/member), `status` (pending/approved/rejected)
-- **Court** – teren, pripada klubu (naziv, podloga, ima li reflektore)
-- **ClubBookingRules** – po klubu: max sati po rezervaciji, max dana unaprijed (jedinstvena za sve terene u klubu)
-- **Reservation** – rezervacija terena: teren, klub, korisnik, vrijeme početka/kraja, status (confirmed/cancelled)
-
-## 6. Database schema (Supabase / PostgreSQL)
-
-```sql
 -- ============================================================
 -- TennisHub MVP - Supabase/Postgres schema
 -- ============================================================
@@ -69,6 +11,9 @@ create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   full_name text,
   phone text,
+  default_club_id uuid references public.clubs(id) on delete set null,
+  avatar_url text,
+  racket text,
   created_at timestamptz not null default now()
 );
 
@@ -92,6 +37,9 @@ create table if not exists public.club_memberships (
   user_id uuid not null references auth.users(id) on delete cascade,
   role text not null default 'member' check (role in ('admin','member')),
   status text not null default 'pending' check (status in ('pending','approved','rejected')),
+  membership_type text not null default 'member' check (membership_type in ('member','guest')),
+  fee_paid boolean not null default false,
+  can_reserve boolean not null default true,
   joined_at timestamptz not null default now(),
   unique (club_id, user_id)
 );
@@ -227,16 +175,22 @@ security definer
 set search_path = public
 as $$
 declare
+  v_min_hours numeric;
   v_max_hours numeric;
   v_max_advance_days integer;
   v_conflict_count integer;
 begin
   select club_id into new.club_id from public.courts where id = new.court_id;
 
-  select max_hours_per_booking, max_advance_days
-    into v_max_hours, v_max_advance_days
+  select min_hours_per_booking, max_hours_per_booking, max_advance_days
+    into v_min_hours, v_max_hours, v_max_advance_days
     from public.club_booking_rules
     where club_id = new.club_id;
+
+  if v_min_hours is not null
+     and (extract(epoch from (new.end_time - new.start_time)) / 3600.0) < v_min_hours then
+    raise exception 'Rezervacija je kraca od minimalno dozvoljenog trajanja od % sati', v_min_hours;
+  end if;
 
   if v_max_hours is not null
      and (extract(epoch from (new.end_time - new.start_time)) / 3600.0) > v_max_hours then
@@ -289,6 +243,11 @@ using (
     where cm1.user_id = auth.uid() and cm1.status = 'approved'
       and cm2.user_id = profiles.id and cm2.status = 'approved'
   )
+  or exists (
+    select 1 from public.club_memberships cm
+    where cm.user_id = profiles.id
+      and public.is_club_admin(cm.club_id)
+  )
 );
 create policy "profiles_insert_own" on public.profiles for insert with check (id = auth.uid());
 create policy "profiles_update_own" on public.profiles for update using (id = auth.uid());
@@ -328,46 +287,3 @@ create policy "reservations_insert_own" on public.reservations for insert
 with check (user_id = auth.uid() and public.is_club_member(club_id));
 create policy "reservations_update" on public.reservations for update
 using (user_id = auth.uid() or public.is_club_admin(club_id));
-```
-
-## 7. Korisnički tokovi (MVP)
-
-### 7.1 Registracija i prijava
-Standardni Supabase Auth email/password signup + login. Nakon registracije korisnik vidi listu dostupnih klubova.
-
-### 7.2 Kreiranje kluba
-Bilo koji prijavljeni korisnik može kreirati novi klub. Kreator automatski postaje Club Admin (odobreno) – riješeno trigerom u bazi (`handle_new_club`), zajedno s defaultnim booking rules redom.
-
-### 7.3 Pridruživanje klubu
-Korisnik pregledava listu klubova i šalje zahtjev za pridruživanje (status = pending). Club Admin vidi listu zahtjeva na svom dashboardu, odobrava ili odbija. Korisnik vidi status svog zahtjeva.
-
-### 7.4 Upravljanje terenima (Admin)
-Admin dodaje/uređuje/briše terene svog kluba i postavlja pravila rezervacije za klub (max sati po rezervaciji, max dana unaprijed).
-
-### 7.5 Rezervacija terena (Member)
-Odobreni član bira teren, datum i vrijeme. Baza (trigger `validate_reservation`) provjerava: poklapanje s pravilima kluba (trajanje, koliko unaprijed) i sukob s postojećom rezervacijom. UI prikazuje grešku ako baza odbije insert. Član može otkazati vlastitu rezervaciju (status → cancelled).
-
-## 8. Izvan opsega za MVP
-
-- Liga modul (raspored natjecanja, unos rezultata, ljestvica)
-- Plaćanja / članarine
-- Notifikacije (email / push)
-- Super Admin dashboard za platformu
-
-## 9. Napomene za AI coding agenta
-
-- Generiraj kod fazno (vidi popis ispod), testiraj svaku fazu prije prelaska na sljedeću
-- UI tekst (labele, poruke korisniku) na hrvatskom jeziku; kod (klase, varijable, nazivi tablica) na engleskom
-- Koristi nullable reference types i async/await konzistentno
-- Supabase C# klijent: https://github.com/supabase-community/supabase-csharp
-
-### Faze implementacije
-
-1. Setup solution strukture (4 projekta), konfiguracija Supabase klijenta (env varijable za URL/anon key)
-2. Auth flow (signup/login/logout) na Web i Mobile
-3. Club CRUD + lista klubova + join request flow
-4. Admin dashboard – pregled i odobravanje zahtjeva za članstvo
-5. Court CRUD (admin)
-6. Booking rules forma (admin)
-7. Reservation flow (member) – kalendarski prikaz zauzetosti, kreiranje, otkazivanje
-8. Osnovni styling i UX polish

@@ -1,0 +1,155 @@
+@page "/clubs/{Id:guid}"
+@attribute [Authorize]
+@inject IAuthService AuthService
+@inject IClubService ClubService
+@inject ICourtService CourtService
+@inject IMembershipService MembershipService
+@inject NavigationManager Navigation
+
+<PageTitle>Detalji kluba</PageTitle>
+
+@if (_isLoading)
+{
+    <div class="d-flex justify-content-center py-5">
+        <div class="spinner-border text-success" role="status">
+            <span class="visually-hidden">Učitavanje...</span>
+        </div>
+    </div>
+}
+else if (_club is null)
+{
+    <div class="alert alert-warning">Klub nije pronađen.</div>
+}
+else
+{
+    <h1>@_club.Name</h1>
+    <p><strong>Adresa:</strong> @(string.IsNullOrWhiteSpace(_club.Address) ? "-" : _club.Address)</p>
+
+    <p><strong>Status članstva:</strong> <span class="badge @_membershipBadgeClass">@_membershipStatusText</span></p>
+
+    <h2>Tereni</h2>
+
+    @if (!string.IsNullOrWhiteSpace(_errorMessage))
+    {
+        <div class="alert alert-danger">@_errorMessage</div>
+    }
+    else if (!_hasCourtAccess)
+    {
+        <p>Popis terena dostupan je nakon odobrenja članstva.</p>
+    }
+    else if (_courts.Count == 0)
+    {
+        <p>Klub još nema evidentiranih terena.</p>
+    }
+    else
+    {
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Naziv</th>
+                        <th>Podloga</th>
+                        <th>Reflektori</th>
+                        <th>Rezervacija</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var court in _courts)
+                    {
+                        <tr>
+                            <td>@court.Name</td>
+                            <td>@(string.IsNullOrWhiteSpace(court.SurfaceType) ? "-" : court.SurfaceType)</td>
+                            <td>@(court.HasFloodlights ? "Da" : "Ne")</td>
+                            <td>
+                                <a class="btn btn-sm btn-outline-primary" href="@($"/clubs/{Id}/courts/{court.Id}/reserve")">Rezerviraj</a>
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
+
+    @if (_hasCourtAccess)
+    {
+        <a class="btn btn-outline-success me-2" href="@($"/clubs/{Id}/schedule")">Raspored terena</a>
+        <a class="btn btn-outline-info me-2" href="@($"/clubs/{Id}/leagues")">Lige</a>
+    }
+
+    @if (_isAdmin)
+    {
+        <a class="btn btn-outline-primary" href="@($"/clubs/{Id}/admin")">Admin dashboard</a>
+    }
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private TennisHub.Core.Models.Club? _club;
+    private readonly List<TennisHub.Core.Models.Court> _courts = [];
+    private bool _isLoading = true;
+    private bool _isAdmin;
+    private bool _hasCourtAccess;
+    private string _membershipStatusText = "Nije član";
+    private string _membershipBadgeClass = "bg-secondary";
+    private string? _errorMessage;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        _isLoading = true;
+        _errorMessage = null;
+        _courts.Clear();
+        _isAdmin = false;
+        _hasCourtAccess = false;
+        _membershipStatusText = "Nije član";
+        _membershipBadgeClass = "bg-secondary";
+
+        await AuthService.InitializeAsync();
+        var user = AuthService.CurrentUser;
+        if (user is null || !Guid.TryParse(user.Id, out var userId))
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        _club = await ClubService.GetClubByIdAsync(Id);
+
+        var membership = await MembershipService.GetMembershipAsync(Id, userId);
+        if (membership is not null)
+        {
+            _isAdmin = membership.Status == TennisHub.Core.Enums.MembershipStatus.Approved
+                && membership.Role == TennisHub.Core.Enums.MembershipRole.Admin;
+            _hasCourtAccess = membership.Status == TennisHub.Core.Enums.MembershipStatus.Approved;
+            _membershipStatusText = membership.Status switch
+            {
+                TennisHub.Core.Enums.MembershipStatus.Pending => "Na čekanju",
+                TennisHub.Core.Enums.MembershipStatus.Rejected => "Odbijen",
+                TennisHub.Core.Enums.MembershipStatus.Approved when _isAdmin => "Admin",
+                TennisHub.Core.Enums.MembershipStatus.Approved => "Odobren",
+                _ => "Nije član"
+            };
+            _membershipBadgeClass = membership.Status switch
+            {
+                TennisHub.Core.Enums.MembershipStatus.Pending => "bg-warning text-dark",
+                TennisHub.Core.Enums.MembershipStatus.Rejected => "bg-danger",
+                TennisHub.Core.Enums.MembershipStatus.Approved => "bg-success",
+                _ => "bg-secondary"
+            };
+        }
+
+        if (_hasCourtAccess)
+        {
+            try
+            {
+                _courts.AddRange(await CourtService.GetCourtsAsync(Id));
+            }
+            catch (Exception ex)
+            {
+                _errorMessage = $"Neuspješno učitavanje terena: {ex.Message}";
+            }
+        }
+
+        _isLoading = false;
+    }
+}
